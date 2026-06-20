@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Panels{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center">
+    <h2>📋 Reaction Panels</h2>
+    <a href="{{ url_for('panel_add') }}" class="btn btn-primary no-print">+ Add Panel</a>
+</div>
+<table class="table table-striped mt-3">
+    <thead><tr><th>Name</th><th>Description</th><th>Organism</th><th>Created</th><th>Action</th></tr></thead>
+    <tbody>
+        {% for panel in panels %}
+        <tr>
+            <td>{{ panel.panel_name }}</td>
+            <td>{{ panel.description or '-' }}</td>
+            <td>{{ panel.organism or '-' }}</td>
+            <td>{{ panel.created_at }}</td>
+            <td>
+                <a href="{{ url_for('panel_detail', panel_id=panel.id) }}" class="btn btn-sm btn-info">View</a>
+                {% if session.role == 'admin' %}
+                <a href="{{ url_for('panel_delete', panel_id=panel.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('Delete panel?')">Delete</a>
+                {% endif %}
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-muted">No panels found.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
