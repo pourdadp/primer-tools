@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Reset Requests{% endblock %}
+{% block content %}
+<h2>🔑 Password Reset Requests</h2>
+<table class="table table-striped">
+    <thead><tr><th>User</th><th>Requested At</th><th>Status</th><th>Action</th></tr></thead>
+    <tbody>
+        {% for req in requests %}
+        <tr>
+            <td>{{ req.username }}</td>
+            <td>{{ req.requested_at }}</td>
+            <td><span class="badge bg-warning">{{ req.status }}</span></td>
+            <td>
+                <a href="{{ url_for('admin_reset_detail', request_id=req.id) }}" class="btn btn-sm btn-primary">Review</a>
+                <a href="{{ url_for('admin_reset_cancel', request_id=req.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('Cancel this request?')">Cancel</a>
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-muted">No pending reset requests.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
