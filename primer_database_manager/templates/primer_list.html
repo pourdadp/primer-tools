@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Primer List{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center">
+    <h2>🧬 Primers</h2>
+    <div>
+        <a href="{{ url_for('primer_add') }}" class="btn btn-primary no-print">+ Add Primer</a>
+        <button class="btn btn-success no-print" onclick="window.print()">🖨️ Print</button>
+    </div>
+</div>
+
+<!-- Simple search filter -->
+<form method="GET" class="row g-2 mt-3 no-print">
+    <div class="col-md-3">
+        <input type="text" class="form-control" name="name" placeholder="Name" value="{{ filters.name or '' }}">
+    </div>
+    <div class="col-md-3">
+        <input type="text" class="form-control" name="gene" placeholder="Gene" value="{{ filters.gene or '' }}">
+    </div>
+    <div class="col-md-3">
+        <input type="text" class="form-control" name="organism" placeholder="Organism" value="{{ filters.organism or '' }}">
+    </div>
+    <div class="col-md-3">
+        <button type="submit" class="btn btn-outline-secondary">Filter</button>
+        <a href="{{ url_for('primer_list') }}" class="btn btn-outline-secondary">Clear</a>
+    </div>
+</form>
+
+<table class="table table-striped mt-3">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Pair</th>
+            <th>Gene</th>
+            <th>Organism</th>
+            <th>Length</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for primer in primers %}
+        <tr>
+            <td>{{ primer.name }}</td>
+            <td>{{ primer.pair_name or '-' }}</td>
+            <td>{{ primer.gene or '-' }}</td>
+            <td>{{ primer.organism or '-' }}</td>
+            <td>{{ primer.amplicon_length or '-' }}</td>
+            <td><a href="{{ url_for('primer_detail', primer_id=primer.id) }}" class="btn btn-sm btn-info">View</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-muted">No primers found.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
