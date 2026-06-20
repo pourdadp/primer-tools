@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Advanced Search{% endblock %}
+{% block content %}
+<h2>🔍 Advanced Search</h2>
+<p class="text-muted">Leave fields empty to ignore them.</p>
+<form method="POST" class="row g-3">
+    <div class="col-md-4"><input type="text" class="form-control" name="name" placeholder="Name"></div>
+    <div class="col-md-4"><input type="text" class="form-control" name="pair_name" placeholder="Pair Name"></div>
+    <div class="col-md-4"><input type="text" class="form-control" name="gene" placeholder="Gene"></div>
+    <div class="col-md-3"><input type="text" class="form-control" name="organism" placeholder="Organism"></div>
+    <div class="col-md-3"><input type="text" class="form-control" name="strain_or_serotype" placeholder="Strain/Serotype"></div>
+    <div class="col-md-3"><input type="text" class="form-control" name="pcr_type" placeholder="PCR Type"></div>
+    <div class="col-md-3"><input type="text" class="form-control" name="reference" placeholder="Reference"></div>
+    <div class="col-md-4"><input type="text" class="form-control" name="diagnostic_limitations" placeholder="Diagnostic Limitations"></div>
+    <div class="col-md-4"><input type="text" class="form-control" name="binding_region" placeholder="Binding Region"></div>
+    <div class="col-md-2"><input type="number" class="form-control" name="amplicon_length_min" placeholder="Min Length"></div>
+    <div class="col-md-2"><input type="number" class="form-control" name="amplicon_length_max" placeholder="Max Length"></div>
+    <div class="col-md-2"><input type="number" step="0.1" class="form-control" name="estimated_tm_min" placeholder="Min Tm"></div>
+    <div class="col-md-2"><input type="number" step="0.1" class="form-control" name="estimated_tm_max" placeholder="Max Tm"></div>
+    <div class="col-md-2"><div class="form-check"><input class="form-check-input" type="checkbox" name="for_sequencing"> For Sequencing</div></div>
+    <div class="col-md-2"><div class="form-check"><input class="form-check-input" type="checkbox" name="for_diagnosis"> For Diagnosis</div></div>
+    <div class="col-12"><button type="submit" class="btn btn-primary">Search</button></div>
+</form>
+
+{% if results %}
+<h4 class="mt-4">Results ({{ results|length }})</h4>
+<table class="table table-striped">
+    <thead><tr><th>Name</th><th>Pair</th><th>Gene</th><th>Organism</th><th>Length</th><th>Action</th></tr></thead>
+    <tbody>
+        {% for p in results %}
+        <tr>
+            <td>{{ p.name }}</td>
+            <td>{{ p.pair_name or '-' }}</td>
+            <td>{{ p.gene or '-' }}</td>
+            <td>{{ p.organism or '-' }}</td>
+            <td>{{ p.amplicon_length or '-' }}</td>
+            <td><a href="{{ url_for('primer_detail', primer_id=p.id) }}" class="btn btn-sm btn-info">View</a></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}
