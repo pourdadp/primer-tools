@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Add Primer{% endblock %}
+{% block content %}
+<h2>➕ Add New Primer</h2>
+<form method="POST" class="row g-3">
+    <div class="col-md-6">
+        <label class="form-label">Name *</label>
+        <input type="text" class="form-control" name="name" required>
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">Pair Name</label>
+        <input type="text" class="form-control" name="pair_name">
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">Forward Sequence *</label>
+        <input type="text" class="form-control sequence" name="forward_sequence" required>
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">Reverse Sequence</label>
+        <input type="text" class="form-control sequence" name="reverse_sequence">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Gene</label>
+        <input type="text" class="form-control" name="gene">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Organism</label>
+        <input type="text" class="form-control" name="organism">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Strain/Serotype</label>
+        <input type="text" class="form-control" name="strain_or_serotype">
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">PCR Type</label>
+        <select class="form-select" name="pcr_type">
+            <option value="">-- Select --</option>
+            <option value="qPCR">qPCR</option>
+            <option value="Conventional">Conventional</option>
+            <option value="Multiplex">Multiplex</option>
+            <option value="Nested">Nested</option>
+            <option value="RT-PCR">RT-PCR</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Amplicon Length (bp)</label>
+        <input type="number" class="form-control" name="amplicon_length">
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Estimated Tm (°C)</label>
+        <input type="number" step="0.1" class="form-control" name="estimated_tm">
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Experimental Tm (°C)</label>
+        <input type="number" step="0.1" class="form-control" name="experimental_tm">
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">Reference</label>
+        <input type="text" class="form-control" name="reference">
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">Diagnostic Limitations</label>
+        <input type="text" class="form-control" name="diagnostic_limitations">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Binding Region</label>
+        <input type="text" class="form-control" name="binding_region">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Binding Detail</label>
+        <input type="text" class="form-control" name="binding_detail">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Stock Concentration (µM)</label>
+        <input type="number" step="0.1" class="form-control" name="stock_concentration">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Working Volume (µL)</label>
+        <input type="number" step="0.1" class="form-control" name="working_volume_per_reaction">
+    </div>
+    <div class="col-md-8">
+        <label class="form-label">General Notes</label>
+        <input type="text" class="form-control" name="general_notes">
+    </div>
+    <div class="col-12">
+        <div class="form-check form-check-inline">
+            <input class="form-check-input" type="checkbox" name="for_sequencing">
+            <label class="form-check-label">For Sequencing</label>
+        </div>
+        <div class="form-check form-check-inline">
+            <input class="form-check-input" type="checkbox" name="for_diagnosis">
+            <label class="form-check-label">For Diagnosis</label>
+        </div>
+    </div>
+
+    <div class="col-12">
+        <h5>Custom Fields</h5>
+        <div id="customFields">
+            <div class="row g-2 mb-2">
+                <div class="col-md-5"><input type="text" class="form-control" name="custom_field_name" placeholder="Field name"></div>
+                <div class="col-md-5"><input type="text" class="form-control" name="custom_field_value" placeholder="Value"></div>
+                <div class="col-md-2"><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.row').remove()">Remove</button></div>
+            </div>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="addCustomField()">+ Add Custom Field</button>
+    </div>
+
+    <div class="col-12">
+        <button type="submit" class="btn btn-primary">Save Primer</button>
+        <a href="{{ url_for('primer_list') }}" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+
+<script>
+function addCustomField() {
+    const container = document.getElementById('customFields');
+    const row = document.createElement('div');
+    row.className = 'row g-2 mb-2';
+    row.innerHTML = `
+        <div class="col-md-5"><input type="text" class="form-control" name="custom_field_name" placeholder="Field name"></div>
+        <div class="col-md-5"><input type="text" class="form-control" name="custom_field_value" placeholder="Value"></div>
+        <div class="col-md-2"><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.row').remove()">Remove</button></div>
+    `;
+    container.appendChild(row);
+}
+</script>
+{% endblock %}
