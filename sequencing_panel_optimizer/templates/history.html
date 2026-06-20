@@ -1,1 +1,57 @@
 
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Optimization History</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        footer {
+            margin-top: 40px;
+            padding: 15px 0;
+            border-top: 1px solid #dee2e6;
+            font-size: 0.9rem;
+            color: #6c757d;
+            text-align: center;
+        }
+        footer a { color: #0d6efd; text-decoration: none; }
+        @media print {
+            .no-print { display: none !important; }
+            @page { size: A4 portrait; margin: 8mm 10mm; }
+        }
+    </style>
+</head>
+<body>
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center no-print">
+        <h2>📜 Optimization History</h2>
+        <button class="btn btn-success" onclick="window.print()">🖨️ Print</button>
+    </div>
+    <table class="table table-striped">
+        <thead>
+            <tr><th>Date/Time</th><th># Primers</th><th>DNA Length</th><th>Status</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+        {% for item in history %}
+        <tr>
+            <td>{{ item.date }}</td>
+            <td>{{ item.num_primers }}</td>
+            <td>{{ item.dna_length }}</td>
+            <td><span class="badge bg-{{ 'success' if item.status == 'success' else 'danger' }}">{{ item.status }}</span></td>
+            <td><a href="/results/{{ item.run_id }}" class="btn btn-sm btn-info">View</a></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <a href="/" class="btn btn-primary no-print">Back</a>
+</div>
+<footer>
+    <div class="container">
+        <p>
+            <strong>Sequencing Panel Optimizer v1.0</strong> – Developed by <strong>Pourdad Panahi</strong> (2025).
+            Available at: <a href="https://github.com/pourdadp/pourdadp.github.io/blob/main/index.html" target="_blank">https://github.com/pourdadp/pourdadp.github.io</a>.
+        </p>
+    </div>
+</footer>
+</body>
+</html>
