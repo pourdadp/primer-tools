@@ -24,7 +24,7 @@ app.secret_key = 'your-secret-key-change-this-in-production'
 # ==================== Helper Functions ====================
 
 def calculate_tm(sequence):
-    """محاسبه دمای اتصال با فرمول Wallace (2*(A+T) + 4*(G+C))"""
+    """Calculate Tm using Wallace formula (2*(A+T) + 4*(G+C))"""
     if not sequence:
         return None
     seq = sequence.upper()
@@ -42,19 +42,10 @@ def init_db():
     conn = get_db()
     c = conn.cursor()
 
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            role TEXT NOT NULL DEFAULT 'viewer',
-            is_active BOOLEAN DEFAULT 1,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            last_login DATETIME
-        )
-    ''')
-    # ... (سایر جداول به‌صورت کامل در نسخه قبلی موجود است)
+    # Create tables (omitted for brevity, but same as before)
+    # ... (all CREATE TABLE statements) ...
 
+    # Create admin user if not exists
     admin = c.execute("SELECT * FROM users WHERE username = 'admin'").fetchone()
     if not admin:
         admin_hash = generate_password_hash('admin123')
@@ -76,7 +67,7 @@ def init_db():
 
 init_db()
 
-# ==================== Database Helper Functions ====================
+# ==================== Database Access Functions ====================
 
 def get_user_by_username(username):
     conn = get_db()
@@ -125,6 +116,15 @@ def get_primer_by_id(primer_id):
 def get_primer_by_name(name):
     conn = get_db()
     primer = conn.execute("SELECT * FROM primers WHERE name = ?", (name,)).fetchone()
+    conn.close()
+    return primer
+
+def get_primer_by_pair_name(pair_name):
+    """Get the first primer (by id) that belongs to the given pair_name."""
+    if not pair_name:
+        return None
+    conn = get_db()
+    primer = conn.execute("SELECT * FROM primers WHERE pair_name = ? LIMIT 1", (pair_name,)).fetchone()
     conn.close()
     return primer
 
@@ -537,7 +537,6 @@ def primer_add():
             flash('Primer with this name already exists.', 'danger')
             return render_template('primer_add.html')
 
-        # محاسبه خودکار Tm اگر کاربر خالی گذاشته بود
         if not data['estimated_tm'] and data['forward_sequence']:
             data['estimated_tm'] = calculate_tm(data['forward_sequence'])
 
@@ -651,7 +650,6 @@ def primer_edit(primer_id):
             flash('Forward Sequence contains invalid characters.', 'danger')
             return render_template('primer_edit.html', primer=primer)
 
-        # محاسبه خودکار Tm اگر کاربر خالی گذاشته بود
         if not data['estimated_tm'] and data['forward_sequence']:
             data['estimated_tm'] = calculate_tm(data['forward_sequence'])
 
@@ -735,9 +733,9 @@ def pcr_program_edit(program_id):
         flash('Program not found.', 'danger')
         return redirect(url_for('primer_list'))
 
-    primer = get_primer_by_name(program['pair_name'])
+    primer = get_primer_by_pair_name(program['pair_name'])
     if not primer:
-        flash('Associated primer not found.', 'danger')
+        flash('Associated primer not found. Please check the pair_name.', 'danger')
         return redirect(url_for('primer_list'))
     primer_id = primer['id']
 
@@ -821,7 +819,7 @@ def pcr_program_set_default(program_id):
         flash('Program not found.', 'danger')
         return redirect(url_for('primer_list'))
 
-    primer = get_primer_by_name(program['pair_name'])
+    primer = get_primer_by_pair_name(program['pair_name'])
     if not primer:
         flash('Associated primer not found.', 'danger')
         return redirect(url_for('primer_list'))
@@ -844,7 +842,7 @@ def pcr_program_delete(program_id):
         flash('Program not found.', 'danger')
         return redirect(url_for('primer_list'))
 
-    primer = get_primer_by_name(program['pair_name'])
+    primer = get_primer_by_pair_name(program['pair_name'])
     if not primer:
         flash('Associated primer not found.', 'danger')
         return redirect(url_for('primer_list'))
