@@ -1,18 +1,25 @@
-
 import json
 
 def reverse_complement(seq):
-    comp = {'A':'T', 'T':'A', 'C':'G', 'G':'C'}
+    """Reverse complement with full IUPAC support, including inosine (I)."""
+    comp = {
+        'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C',
+        'R': 'Y', 'Y': 'R', 'S': 'S', 'W': 'W',
+        'K': 'M', 'M': 'K', 'B': 'V', 'V': 'B',
+        'D': 'H', 'H': 'D', 'N': 'N',
+        'I': 'I'  # Inosine pairs with any base, but reverse complement is itself
+    }
     return ''.join(comp[base] for base in reversed(seq))
 
 def are_bases_compatible(b1, b2):
+    """Check if two bases (including IUPAC codes) are compatible."""
     iupac_map = {
         'A': {'A'}, 'C': {'C'}, 'G': {'G'}, 'T': {'T'},
         'R': {'A','G'}, 'Y': {'C','T'}, 'S': {'G','C'},
         'W': {'A','T'}, 'K': {'G','T'}, 'M': {'A','C'},
         'B': {'C','G','T'}, 'D': {'A','G','T'}, 'H': {'A','C','T'},
         'V': {'A','C','G'}, 'N': {'A','C','G','T'},
-        'I': {'A','C','G','T'}
+        'I': {'A','C','G','T'}  # Inosine pairs with anything
     }
     set1 = iupac_map.get(b1.upper(), {b1.upper()})
     set2 = iupac_map.get(b2.upper(), {b2.upper()})
