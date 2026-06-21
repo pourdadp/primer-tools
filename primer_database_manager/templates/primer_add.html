@@ -3,14 +3,13 @@
 {% block content %}
 <h2>➕ Add New Primer</h2>
 
-<!-- Duplicate warning message -->
+<!-- Duplicate warning -->
 {% if duplicate %}
 <div class="alert alert-warning alert-dismissible fade show" role="alert">
-    <strong>⚠️ Duplicate Sequence Detected!</strong>
-    <p>This forward sequence already exists in primer: <strong>{{ existing_name }}</strong>.</p>
+    <strong>⚠️ Duplicate {{ direction }} Sequence Detected!</strong>
+    <p>This {{ direction }} sequence already exists in primer: <strong>{{ existing_name }}</strong>.</p>
     <p>Do you want to add a new name (alias) to this existing primer?</p>
     <form method="POST" id="duplicateForm">
-        <!-- Preserve all previous form data -->
         <input type="hidden" name="confirm_duplicate" value="yes">
         <div class="row">
             <div class="col-md-8">
