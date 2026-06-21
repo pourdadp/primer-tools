@@ -121,6 +121,12 @@ R3,CGATCGATCG
     document.addEventListener('DOMContentLoaded', function() {
         {% if selected_primers %}
             document.getElementById('primers').value = {{ selected_primers|tojson }};
+            // نمایش پیام تأیید
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success alert-dismissible fade show mt-3';
+            alertDiv.innerHTML = '✅ Primers loaded from selection. You can now start optimization.';
+            document.getElementById('mainForm').prepend(alertDiv);
+            setTimeout(() => alertDiv.remove(), 5000);
         {% endif %}
     });
 </script>
