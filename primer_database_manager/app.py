@@ -217,7 +217,7 @@ def init_db():
         )
     ''')
 
-    # --- NEW: Primer aliases table for duplicate sequences ---
+    # Primer aliases table
     c.execute('''
         CREATE TABLE IF NOT EXISTS primer_aliases (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -333,7 +333,7 @@ def add_alias_to_primer(primer_id, alias_name):
         return False, "This alias already exists for this primer."
 
 def check_duplicate_sequence(forward_seq, reverse_seq=None, exclude_id=None):
-    """Check if the same sequence already exists in the database."""
+    """Check if forward or reverse sequence already exists in database."""
     conn = get_db()
     query = "SELECT id, name, forward_sequence, reverse_sequence FROM primers WHERE is_active = 1"
     params = []
@@ -762,19 +762,25 @@ def primer_add():
             flash('Primer with this name already exists.', 'danger')
             return render_template('primer_add.html')
 
-        # --- Duplicate sequence check ---
+        # --- Duplicate sequence check for both forward and reverse ---
         duplicate, existing_id, existing_name, direction = check_duplicate_sequence(
             data['forward_sequence'], data['reverse_sequence']
         )
 
         if duplicate and request.form.get('confirm_duplicate') != 'yes':
-            # Show warning and ask for alias
-            flash(f'This forward sequence already exists in primer "{existing_name}". Do you want to add a new name (alias) to it?', 'warning')
-            return render_template('primer_add.html',
-                                   duplicate=True,
-                                   existing_name=existing_name,
-                                   existing_id=existing_id,
-                                   form_data=data)
+            flash(
+                f'This {direction} sequence already exists in primer "{existing_name}". '
+                f'Do you want to add a new name (alias) to it?',
+                'warning'
+            )
+            return render_template(
+                'primer_add.html',
+                duplicate=True,
+                existing_name=existing_name,
+                existing_id=existing_id,
+                direction=direction,
+                form_data=data
+            )
 
         # Calculate Tm if empty
         if not data['estimated_tm'] and data['forward_sequence']:
