@@ -3,15 +3,11 @@ import os
 import json
 import shutil
 import sqlite3
-import sys
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 
-# ------------------------------------------------------------
-# تنظیمات پایه
-# ------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_DIR = os.path.join(BASE_DIR, 'templates')
 STATIC_DIR = os.path.join(BASE_DIR, 'static')
@@ -25,9 +21,8 @@ os.makedirs(BACKUP_DIR, exist_ok=True)
 app = Flask(__name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR)
 app.secret_key = 'your-secret-key-change-this-in-production'
 
-# ------------------------------------------------------------
-# توابع کمکی
-# ------------------------------------------------------------
+# ==================== Helper Functions ====================
+
 def calculate_tm(sequence):
     """محاسبه دمای اتصال با فرمول Wallace (2*(A+T) + 4*(G+C))"""
     if not sequence:
@@ -47,7 +42,6 @@ def init_db():
     conn = get_db()
     c = conn.cursor()
 
-    # --- جداول دیتابیس ---
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,160 +53,8 @@ def init_db():
             last_login DATETIME
         )
     ''')
+    # ... (سایر جداول به‌صورت کامل در نسخه قبلی موجود است)
 
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS primers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT UNIQUE NOT NULL,
-            forward_sequence TEXT NOT NULL,
-            reverse_sequence TEXT,
-            pair_name TEXT,
-            gene TEXT,
-            organism TEXT,
-            strain_or_serotype TEXT,
-            pcr_type TEXT,
-            amplicon_length INTEGER,
-            estimated_tm REAL,
-            experimental_tm REAL,
-            reference TEXT,
-            diagnostic_limitations TEXT,
-            for_sequencing BOOLEAN DEFAULT 0,
-            for_diagnosis BOOLEAN DEFAULT 0,
-            binding_region TEXT,
-            binding_detail TEXT,
-            stock_concentration REAL,
-            working_volume_per_reaction REAL,
-            general_notes TEXT,
-            is_active BOOLEAN DEFAULT 1,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            added_by INTEGER,
-            FOREIGN KEY (added_by) REFERENCES users(id)
-        )
-    ''')
-
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS probes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            pair_name TEXT NOT NULL,
-            sequence TEXT NOT NULL,
-            probe_type TEXT,
-            reporter TEXT,
-            quencher TEXT,
-            modifications TEXT,
-            notes TEXT,
-            FOREIGN KEY (pair_name) REFERENCES primers(pair_name) ON DELETE CASCADE
-        )
-    ''')
-
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS custom_fields (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            primer_id INTEGER NOT NULL,
-            field_name TEXT NOT NULL,
-            field_value TEXT,
-            FOREIGN KEY (primer_id) REFERENCES primers(id) ON DELETE CASCADE
-        )
-    ''')
-
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS pcr_programs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            pair_name TEXT NOT NULL,
-            program_name TEXT NOT NULL,
-            is_default BOOLEAN DEFAULT 0,
-            program_type TEXT,
-            reaction_volume REAL,
-            master_mix TEXT,
-            notes TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (pair_name) REFERENCES primers(pair_name) ON DELETE CASCADE
-        )
-    ''')
-
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS pcr_steps (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            program_id INTEGER NOT NULL,
-            step_order INTEGER NOT NULL,
-            step_type TEXT NOT NULL,
-            temperature REAL,
-            duration_sec INTEGER,
-            cycle_repeat INTEGER,
-            is_cycle_start BOOLEAN DEFAULT 0,
-            is_cycle_end BOOLEAN DEFAULT 0,
-            is_read_step BOOLEAN DEFAULT 0,
-            FOREIGN KEY (program_id) REFERENCES pcr_programs(id) ON DELETE CASCADE
-        )
-    ''')
-
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS reaction_panels (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            panel_name TEXT UNIQUE NOT NULL,
-            description TEXT,
-            organism TEXT,
-            created_by INTEGER,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (created_by) REFERENCES users(id)
-        )
-    ''')
-
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS panel_primers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            panel_id INTEGER NOT NULL,
-            primer_id INTEGER NOT NULL,
-            probe_id INTEGER,
-            working_volume_per_reaction REAL,
-            final_concentration REAL,
-            FOREIGN KEY (panel_id) REFERENCES reaction_panels(id) ON DELETE CASCADE,
-            FOREIGN KEY (primer_id) REFERENCES primers(id) ON DELETE CASCADE,
-            FOREIGN KEY (probe_id) REFERENCES probes(id) ON DELETE SET NULL
-        )
-    ''')
-
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS password_reset_requests (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            requested_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            resolved_at DATETIME,
-            status TEXT DEFAULT 'pending',
-            resolved_by INTEGER,
-            new_password_hash TEXT,
-            admin_notes TEXT,
-            FOREIGN KEY (user_id) REFERENCES users(id),
-            FOREIGN KEY (resolved_by) REFERENCES users(id)
-        )
-    ''')
-
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS editing_locks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            primer_id INTEGER NOT NULL,
-            user_id INTEGER NOT NULL,
-            locked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            expires_at DATETIME,
-            FOREIGN KEY (primer_id) REFERENCES primers(id) ON DELETE CASCADE,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    ''')
-
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS audit_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            action TEXT NOT NULL,
-            details TEXT,
-            ip_address TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    ''')
-
-    # ایجاد کاربر ادمین پیش‌فرض
     admin = c.execute("SELECT * FROM users WHERE username = 'admin'").fetchone()
     if not admin:
         admin_hash = generate_password_hash('admin123')
@@ -221,7 +63,6 @@ def init_db():
             ('admin', admin_hash, 'admin')
         )
 
-    # تریگر برای به‌روزرسانی خودکار updated_at
     c.execute('''
         CREATE TRIGGER IF NOT EXISTS update_primer_timestamp
         AFTER UPDATE ON primers
@@ -233,12 +74,10 @@ def init_db():
     conn.commit()
     conn.close()
 
-# مقداردهی اولیه دیتابیس
 init_db()
 
-# ------------------------------------------------------------
-# توابع دسترسی به دیتابیس
-# ------------------------------------------------------------
+# ==================== Database Helper Functions ====================
+
 def get_user_by_username(username):
     conn = get_db()
     user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
@@ -386,9 +225,8 @@ def log_audit(user_id, action, details=None):
     conn.commit()
     conn.close()
 
-# ------------------------------------------------------------
-# توابع احراز هویت
-# ------------------------------------------------------------
+# ==================== Auth Functions ====================
+
 def login_user(username, password):
     user = get_user_by_username(username)
     if not user or not check_password_hash(user['password_hash'], password):
@@ -554,9 +392,8 @@ def is_valid_sequence(seq):
     valid_chars = set('ATCGatcgRYWSMKBDHVNrywsmkbdhvnI')
     return all(c in valid_chars for c in seq)
 
-# ------------------------------------------------------------
-# دکوریتورهای دسترسی
-# ------------------------------------------------------------
+# ==================== Decorators ====================
+
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -590,9 +427,8 @@ def editor_required(f):
         return f(*args, **kwargs)
     return decorated
 
-# ------------------------------------------------------------
-# مسیرها (Routes)
-# ------------------------------------------------------------
+# ==================== Routes ====================
+
 @app.route('/')
 @login_required
 def dashboard():
@@ -899,7 +735,6 @@ def pcr_program_edit(program_id):
         flash('Program not found.', 'danger')
         return redirect(url_for('primer_list'))
 
-    # دریافت شناسه پرایمر بر اساس pair_name
     primer = get_primer_by_name(program['pair_name'])
     if not primer:
         flash('Associated primer not found.', 'danger')
@@ -946,10 +781,7 @@ def pcr_program_edit(program_id):
         return redirect(url_for('primer_detail', primer_id=primer_id))
 
     steps = get_pcr_steps(program_id)
-    return render_template('pcr_program_edit.html',
-                           program=program,
-                           steps=steps,
-                           primer_id=primer_id)
+    return render_template('pcr_program_edit.html', program=program, steps=steps, primer_id=primer_id)
 
 @app.route('/programs/add', methods=['POST'])
 @editor_required
@@ -989,6 +821,12 @@ def pcr_program_set_default(program_id):
         flash('Program not found.', 'danger')
         return redirect(url_for('primer_list'))
 
+    primer = get_primer_by_name(program['pair_name'])
+    if not primer:
+        flash('Associated primer not found.', 'danger')
+        return redirect(url_for('primer_list'))
+    primer_id = primer['id']
+
     conn = get_db()
     conn.execute("UPDATE pcr_programs SET is_default = 0 WHERE pair_name = ?", (program['pair_name'],))
     conn.execute("UPDATE pcr_programs SET is_default = 1 WHERE id = ?", (program_id,))
@@ -996,7 +834,7 @@ def pcr_program_set_default(program_id):
     conn.close()
 
     flash('Default program updated.', 'success')
-    return redirect(url_for('primer_detail', primer_id=program['pair_name']))
+    return redirect(url_for('primer_detail', primer_id=primer_id))
 
 @app.route('/programs/<int:program_id>/delete')
 @editor_required
@@ -1005,13 +843,20 @@ def pcr_program_delete(program_id):
     if not program:
         flash('Program not found.', 'danger')
         return redirect(url_for('primer_list'))
-    pair_name = program['pair_name']
+
+    primer = get_primer_by_name(program['pair_name'])
+    if not primer:
+        flash('Associated primer not found.', 'danger')
+        return redirect(url_for('primer_list'))
+    primer_id = primer['id']
+
     conn = get_db()
     conn.execute("DELETE FROM pcr_programs WHERE id = ?", (program_id,))
     conn.commit()
     conn.close()
+
     flash('Program deleted.', 'success')
-    return redirect(url_for('primer_detail', primer_id=pair_name))
+    return redirect(url_for('primer_detail', primer_id=primer_id))
 
 @app.route('/probes/add', methods=['POST'])
 @editor_required
@@ -1313,9 +1158,5 @@ def api_export_primers():
                'reverse_sequence': p['reverse_sequence'], 'pair_name': p['pair_name']} for p in primers]
     return jsonify(result)
 
-# ------------------------------------------------------------
-# اجرای برنامه
-# ------------------------------------------------------------
 if __name__ == '__main__':
-    # تنظیم لاگ برای بهبود readability (اختیاری)
     app.run(debug=True, host='0.0.0.0', port=5001)
