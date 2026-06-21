@@ -3,11 +3,15 @@ import os
 import json
 import shutil
 import sqlite3
+import sys
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 
+# ------------------------------------------------------------
+# تنظیمات پایه
+# ------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_DIR = os.path.join(BASE_DIR, 'templates')
 STATIC_DIR = os.path.join(BASE_DIR, 'static')
@@ -21,10 +25,11 @@ os.makedirs(BACKUP_DIR, exist_ok=True)
 app = Flask(__name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR)
 app.secret_key = 'your-secret-key-change-this-in-production'
 
-# ==================== Helper Functions ====================
-
+# ------------------------------------------------------------
+# توابع کمکی
+# ------------------------------------------------------------
 def calculate_tm(sequence):
-    """محاسبه‌ی دمای اتصال با فرمول Wallace (2*(A+T) + 4*(G+C))"""
+    """محاسبه دمای اتصال با فرمول Wallace (2*(A+T) + 4*(G+C))"""
     if not sequence:
         return None
     seq = sequence.upper()
@@ -42,6 +47,7 @@ def init_db():
     conn = get_db()
     c = conn.cursor()
 
+    # --- جداول دیتابیس ---
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -206,7 +212,7 @@ def init_db():
         )
     ''')
 
-    # Create default admin user
+    # ایجاد کاربر ادمین پیش‌فرض
     admin = c.execute("SELECT * FROM users WHERE username = 'admin'").fetchone()
     if not admin:
         admin_hash = generate_password_hash('admin123')
@@ -215,6 +221,7 @@ def init_db():
             ('admin', admin_hash, 'admin')
         )
 
+    # تریگر برای به‌روزرسانی خودکار updated_at
     c.execute('''
         CREATE TRIGGER IF NOT EXISTS update_primer_timestamp
         AFTER UPDATE ON primers
@@ -226,10 +233,12 @@ def init_db():
     conn.commit()
     conn.close()
 
+# مقداردهی اولیه دیتابیس
 init_db()
 
-# ==================== Database Helper Functions ====================
-
+# ------------------------------------------------------------
+# توابع دسترسی به دیتابیس
+# ------------------------------------------------------------
 def get_user_by_username(username):
     conn = get_db()
     user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
@@ -377,8 +386,9 @@ def log_audit(user_id, action, details=None):
     conn.commit()
     conn.close()
 
-# ==================== Auth Functions ====================
-
+# ------------------------------------------------------------
+# توابع احراز هویت
+# ------------------------------------------------------------
 def login_user(username, password):
     user = get_user_by_username(username)
     if not user or not check_password_hash(user['password_hash'], password):
@@ -544,8 +554,9 @@ def is_valid_sequence(seq):
     valid_chars = set('ATCGatcgRYWSMKBDHVNrywsmkbdhvnI')
     return all(c in valid_chars for c in seq)
 
-# ==================== Decorators ====================
-
+# ------------------------------------------------------------
+# دکوریتورهای دسترسی
+# ------------------------------------------------------------
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -579,8 +590,9 @@ def editor_required(f):
         return f(*args, **kwargs)
     return decorated
 
-# ==================== Routes ====================
-
+# ------------------------------------------------------------
+# مسیرها (Routes)
+# ------------------------------------------------------------
 @app.route('/')
 @login_required
 def dashboard():
@@ -887,6 +899,13 @@ def pcr_program_edit(program_id):
         flash('Program not found.', 'danger')
         return redirect(url_for('primer_list'))
 
+    # دریافت شناسه پرایمر بر اساس pair_name
+    primer = get_primer_by_name(program['pair_name'])
+    if not primer:
+        flash('Associated primer not found.', 'danger')
+        return redirect(url_for('primer_list'))
+    primer_id = primer['id']
+
     if request.method == 'POST':
         program_name = request.form.get('program_name')
         program_type = request.form.get('program_type')
@@ -924,10 +943,13 @@ def pcr_program_edit(program_id):
         conn.close()
 
         flash('Program updated.', 'success')
-        return redirect(url_for('primer_detail', primer_id=program['pair_name']))
+        return redirect(url_for('primer_detail', primer_id=primer_id))
 
     steps = get_pcr_steps(program_id)
-    return render_template('pcr_program_edit.html', program=program, steps=steps)
+    return render_template('pcr_program_edit.html',
+                           program=program,
+                           steps=steps,
+                           primer_id=primer_id)
 
 @app.route('/programs/add', methods=['POST'])
 @editor_required
@@ -1291,5 +1313,9 @@ def api_export_primers():
                'reverse_sequence': p['reverse_sequence'], 'pair_name': p['pair_name']} for p in primers]
     return jsonify(result)
 
+# ------------------------------------------------------------
+# اجرای برنامه
+# ------------------------------------------------------------
 if __name__ == '__main__':
+    # تنظیم لاگ برای بهبود readability (اختیاری)
     app.run(debug=True, host='0.0.0.0', port=5001)
