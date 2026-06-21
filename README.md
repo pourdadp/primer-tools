@@ -1,66 +1,53 @@
-# primer-tools
 🧬 Primer Tools Suite
 
-A comprehensive, open‑source toolkit for PCR primer panel optimization and primer database management. Designed for molecular biologists and bioinformaticians, this suite helps you select existing primers for full‑length targeted sequencing and manage your primer inventory with an advanced web interface.
+A comprehensive, open‑source toolkit for PCR primer panel optimization and primer database management.
 
-📦 Repository Structure
+This repository contains two powerful tools designed for molecular biologists and bioinformaticians:
 
-```
-primer-tools/
-├── sequencing_panel_optimizer/   # Optimize primer panels for targeted sequencing
-│   ├── app.py
-│   ├── requirements.txt
-│   ├── install.bat
-│   ├── run.bat
-│   ├── templates/
-│   └── scripts/
-└── primer_database_manager/      # Manage primer inventory, probes, and PCR programs
-    ├── app.py
-    ├── requirements.txt
-    ├── install.bat
-    ├── run.bat
-    ├── templates/
-    └── static/
-```
+· Sequencing Panel Optimizer (SPO) – Select the best combination of existing primers to generate overlapping amplicons for full‑length targeted sequencing.
+· Primer Database Manager (PDM) – A complete web‑based system to manage primers, probes, PCR programs, and multiplex panels.
 
-🧬 1. Sequencing Panel Optimizer (SPO)
+---
 
-Select the best combination of existing primers to generate overlapping amplicons for full‑length targeted sequencing.
+🔬 1. Sequencing Panel Optimizer (SPO)
 
-✨ Key Features
+Optimize your primer panels for targeted sequencing by selecting the most efficient set from your existing primer inventory.
 
-· Sequence Analysis: Input your target DNA sequence.
-· Primer Loading: Manually paste primers or load them directly from the Primer Database Manager.
-· Automatic Direction Detection: Detects if primers bind in Forward/Reverse orientation.
-· IUPAC & Inosine Support: Fully supports degenerate primers (e.g., R, Y, N, I).
-· Filtering & Validation:
-  · Rejects primers that bind to multiple sites or in both directions.
-  · Validates amplicon length (user‑defined min/max).
-  · Checks primer Tm compatibility and dimer formation.
-· Coverage Optimization: Uses a greedy algorithm to find the optimal set of primers covering the whole target.
-· Visualization: Generates a graphical map of primer binding sites (PNG).
-· Outputs: Downloadable JSON reports (binding results, valid pairs, optimal panel).
-· History Tracking: Logs all runs with status and parameters.
+Key Features
+
+· Sequence Analysis – Paste your target DNA sequence and get instant results.
+· Flexible Primer Loading – Manually enter primers or load them directly from the Primer Database Manager.
+· Automatic Direction Detection – Identifies whether primers bind in Forward or Reverse orientation.
+· Full IUPAC & Inosine Support – Handles degenerate primers (e.g., R, Y, N, I) without errors.
+· Smart Filtering – Rejects primers that bind to multiple sites or in both directions.
+· Amplicon Length Control – User‑defined min/max product length.
+· Tm & Dimer Checks – Validates primer compatibility and prevents dimer formation.
+· Greedy Coverage Optimization – Finds the optimal set of primers to cover the entire target with minimal amplicons.
+· Visualization – Generates a graphical map of primer binding sites.
+· Downloadable Reports – Export results as JSON (binding results, valid pairs, optimal panel).
+· History Tracking – Logs all runs with status and parameters.
+
+---
 
 🗄️ 2. Primer Database Manager (PDM)
 
-A comprehensive web‑based management system for primers, probes, and PCR programs.
+A fully‑featured web application to manage your primer inventory, probes, and PCR programs.
 
-✨ Key Features
+Key Features
 
 👥 User Management
 
 · Multi‑user roles: Admin, Editor, Viewer.
 · Admin can create/disable users and change roles.
 · Secure password hashing (Werkzeug).
-· Password Reset: Users request a reset; Admin receives a notification and sets a new password (no email required).
+· Password Reset – Users request a reset; Admin receives a notification and sets a new password (no email required).
 
 🧬 Primer Management
 
 · Full CRUD (Create, Read, Update, Delete) for primers.
 · Store detailed metadata: Gene, Organism, Strain/Serotype, Tm (estimated/experimental), Amplicon length, Binding region, and more.
-· Editing Lock: Prevents simultaneous edits (one user at a time). Admin can break the lock.
-· Custom Fields: Users can add dynamic key‑value fields to any primer.
+· Editing Lock – Prevents simultaneous edits (one user at a time). Admin can break the lock.
+· Custom Fields – Add dynamic key‑value fields to any primer.
 
 🔬 Probe Management
 
@@ -73,8 +60,8 @@ A comprehensive web‑based management system for primers, probes, and PCR progr
 · Default Program selection.
 · Define steps: Denaturation, Annealing, Extension, Reverse Transcription, Melt Curve, Hold.
 · Mark steps for Real‑Time data acquisition (Read Step).
-· Schematic Visualization: Generates a graphical timeline of the PCR protocol.
-· Linear Text Output: Displays the program as a step‑by‑step text protocol.
+· Schematic Visualization – Graphical timeline of the PCR protocol using Chart.js.
+· Linear Text Output – Displays the program as a step‑by‑step text protocol.
 
 📋 Multiplex Panels
 
@@ -91,13 +78,17 @@ A comprehensive web‑based management system for primers, probes, and PCR progr
 · All pages (except login) are optimized for A4 printing.
 · Print button available; non‑essential elements are hidden automatically.
 
+---
+
 🔗 Integration Between Tools
 
 The Sequencing Panel Optimizer can directly import primers from the Primer Database Manager.
 
-· In SPO, click the "📂 Load from Database" button.
-· SPO will fetch active primers (name and sequence) from the shared primers.db file.
+· In SPO, click the "📂 Load All from Database" button to load all primers, or use "🔍 Select from Database" to pick specific ones.
+· SPO fetches active primers (name and sequence) from the shared primers.db file.
 · This creates a seamless workflow: Manage → Optimize → Sequence.
+
+---
 
 ⚙️ Installation & Setup
 
@@ -167,6 +158,8 @@ Default Admin Login (PDM):
 · Username: admin
 · Password: admin123
 
+---
+
 🔧 Manual Installation (for Linux/macOS)
 
 If you are on Linux/macOS, simply use pip:
@@ -181,21 +174,53 @@ pip install flask werkzeug
 python app.py
 ```
 
-📸 Screenshots (Placeholder)
+---
+
+📸 Screenshots
 
 (Add screenshots of the Dashboard, Primer Detail, PCR Program Editor, and SPO Results here)
+
+---
 
 🛠️ Technologies Used
 
 · Backend: Python, Flask
 · Database: SQLite (embedded)
 · Frontend: Bootstrap 5, Jinja2
-· Visualization: Matplotlib (for SPO charts)
+· Visualization: Matplotlib (for SPO charts), Chart.js (for PCR profiles)
 · Authentication: Werkzeug (password hashing)
 
-📜 License
+---
+
+📄 License
 
 This project is open‑source and available under the MIT License.
+
+```
+MIT License
+
+Copyright (c) 2025 Pourdad Panahi
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+---
 
 👨‍💻 Developer
 
@@ -203,14 +228,14 @@ Pourdad Panahi
 GitHub: https://github.com/pourdadp
 Project Page: https://github.com/pourdadp/pourdadp.github.io
 
+---
+
 📧 Contact & Support
 
 If you encounter any issues or have feature requests, please open an issue on GitHub or contact the developer directly.
 
+---
+
 🙏 Acknowledgments
 
 Designed with molecular biologists and diagnostic labs in mind. Inspired by real‑world needs for PCR optimization and primer inventory management.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
