@@ -21,7 +21,17 @@ os.makedirs(BACKUP_DIR, exist_ok=True)
 app = Flask(__name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR)
 app.secret_key = 'your-secret-key-change-this-in-production'
 
-# ==================== Database Functions ====================
+# ==================== Helper Functions ====================
+
+def calculate_tm(sequence):
+    """محاسبه‌ی دمای اتصال با فرمول Wallace (2*(A+T) + 4*(G+C))"""
+    if not sequence:
+        return None
+    seq = sequence.upper()
+    at = seq.count('A') + seq.count('T')
+    gc = seq.count('G') + seq.count('C')
+    tm = 2 * at + 4 * gc
+    return round(tm, 1)
 
 def get_db():
     conn = sqlite3.connect(DATABASE_PATH)
@@ -218,7 +228,7 @@ def init_db():
 
 init_db()
 
-# ==================== Helper Functions ====================
+# ==================== Database Helper Functions ====================
 
 def get_user_by_username(username):
     conn = get_db()
@@ -575,14 +585,14 @@ def editor_required(f):
 @login_required
 def dashboard():
     user = get_user_by_id(session['user_id'])
-    primers = get_primers(limit=1000)   # <-- این خط اضافه شد
+    primers = get_primers(limit=1000)
     users = get_all_users()
     panels = get_panels()
-    return render_template('dashboard.html', 
-                           user=user, 
-                           primers=primers,          # <-- این خط اضافه شد
+    return render_template('dashboard.html',
+                           user=user,
+                           primers=primers,
                            primers_count=len(primers),
-                           users_count=len(users), 
+                           users_count=len(users),
                            panels=panels)
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -678,6 +688,10 @@ def primer_add():
         if get_primer_by_name(data['name']):
             flash('Primer with this name already exists.', 'danger')
             return render_template('primer_add.html')
+
+        # محاسبه خودکار Tm اگر کاربر خالی گذاشته بود
+        if not data['estimated_tm'] and data['forward_sequence']:
+            data['estimated_tm'] = calculate_tm(data['forward_sequence'])
 
         conn = get_db()
         c = conn.cursor()
@@ -788,6 +802,10 @@ def primer_edit(primer_id):
         if not is_valid_sequence(data['forward_sequence']):
             flash('Forward Sequence contains invalid characters.', 'danger')
             return render_template('primer_edit.html', primer=primer)
+
+        # محاسبه خودکار Tm اگر کاربر خالی گذاشته بود
+        if not data['estimated_tm'] and data['forward_sequence']:
+            data['estimated_tm'] = calculate_tm(data['forward_sequence'])
 
         conn = get_db()
         c = conn.cursor()
@@ -914,22 +932,32 @@ def pcr_program_edit(program_id):
 @app.route('/programs/add', methods=['POST'])
 @editor_required
 def pcr_program_add():
-    pair_name = request.form.get('pair_name')
+    primer_id = request.form.get('primer_id')
     program_name = request.form.get('program_name')
     is_default = request.form.get('is_default') == 'on'
 
+    if not primer_id or not program_name:
+        flash('Primer ID and Program Name are required.', 'danger')
+        return redirect(url_for('primer_list'))
+
+    primer = get_primer_by_id(primer_id)
+    if not primer:
+        flash('Primer not found.', 'danger')
+        return redirect(url_for('primer_list'))
+
     conn = get_db()
     if is_default:
-        conn.execute("UPDATE pcr_programs SET is_default = 0 WHERE pair_name = ?", (pair_name,))
+        conn.execute("UPDATE pcr_programs SET is_default = 0 WHERE pair_name = ?", (primer['pair_name'],))
     conn.execute(
         "INSERT INTO pcr_programs (pair_name, program_name, is_default) VALUES (?, ?, ?)",
-        (pair_name, program_name, is_default)
+        (primer['pair_name'], program_name, is_default)
     )
     conn.commit()
     conn.close()
 
+    log_audit(session['user_id'], 'pcr_program_added', f"Added program {program_name} for {primer['name']}")
     flash('Program created.', 'success')
-    return redirect(url_for('primer_detail', primer_id=pair_name))
+    return redirect(url_for('primer_detail', primer_id=primer_id))
 
 @app.route('/programs/<int:program_id>/set-default')
 @editor_required
