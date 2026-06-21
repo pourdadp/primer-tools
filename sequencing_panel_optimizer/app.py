@@ -15,9 +15,6 @@ SCRIPT_DIR = os.path.join(BASE_DIR, 'scripts')
 UPLOAD_DIR = os.path.join(BASE_DIR, 'results')
 HISTORY_FILE = os.path.join(BASE_DIR, 'history.json')
 
-# مسیر دیتابیس Primer Database Manager
-PDM_DB_PATH = os.path.join(os.path.dirname(BASE_DIR), 'primer_database_manager', 'primers.db')
-
 os.makedirs(TEMPLATE_DIR, exist_ok=True)
 os.makedirs(SCRIPT_DIR, exist_ok=True)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -40,6 +37,26 @@ def save_history(entry):
 def get_history():
     with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
         return json.load(f)
+
+# ==================== پیدا کردن دیتابیس PDM ====================
+
+def find_pdm_database():
+    """پیدا کردن خودکار فایل primers.db در مسیرهای مختلف"""
+    possible_paths = [
+        # ساختار استاندارد: primer-tools/sequencing_panel_optimizer/ و primer-tools/primer_database_manager/
+        os.path.join(os.path.dirname(BASE_DIR), 'primer_database_manager', 'primers.db'),
+        # اگر SPO و PDM در یک پوشه باشند
+        os.path.join(BASE_DIR, 'primers.db'),
+        # اگر از GitHub دانلود شده باشد (primer-tools-main)
+        os.path.join(os.path.dirname(os.path.dirname(BASE_DIR)), 'primer_database_manager', 'primers.db'),
+        # مسیر مطلق (برای کاربران خاص)
+        r'C:\Users\user\Desktop\primer-tools-main\primer_database_manager\primers.db',
+        r'C:\Users\user\Desktop\primer-tools\primer_database_manager\primers.db',
+    ]
+    for path in possible_paths:
+        if os.path.exists(path):
+            return path
+    return None
 
 # ==================== Routes ====================
 
@@ -190,11 +207,12 @@ def sample_data():
 
 @app.route('/load_from_db')
 def load_from_db():
-    if not os.path.exists(PDM_DB_PATH):
+    db_path = find_pdm_database()
+    if not db_path:
         return jsonify({'error': 'Primer database not found. Please run Primer Database Manager first.'}), 404
     
     try:
-        conn = sqlite3.connect(PDM_DB_PATH)
+        conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute('''
@@ -219,12 +237,13 @@ def load_from_db():
 
 @app.route('/load_from_db_selector')
 def load_from_db_selector():
-    if not os.path.exists(PDM_DB_PATH):
-        flash('Primer database not found. Please run Primer Database Manager first.', 'danger')
+    db_path = find_pdm_database()
+    if not db_path:
+        flash('Primer database not found. Please run Primer Database Manager first and add some primers.', 'danger')
         return redirect(url_for('index'))
     
     try:
-        conn = sqlite3.connect(PDM_DB_PATH)
+        conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute('''
@@ -234,6 +253,11 @@ def load_from_db_selector():
         ''')
         primers = cursor.fetchall()
         conn.close()
+        
+        if not primers:
+            flash('No primers found in database. Please add some primers using Primer Database Manager.', 'warning')
+            return redirect(url_for('index'))
+        
         return render_template('primer_selector.html', primers=primers)
     except Exception as e:
         flash(f'Error loading primers: {str(e)}', 'danger')
@@ -246,12 +270,13 @@ def add_selected_primers():
         flash('No primers selected.', 'warning')
         return redirect(url_for('index'))
     
-    if not os.path.exists(PDM_DB_PATH):
+    db_path = find_pdm_database()
+    if not db_path:
         flash('Primer database not found.', 'danger')
         return redirect(url_for('index'))
     
     try:
-        conn = sqlite3.connect(PDM_DB_PATH)
+        conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         placeholders = ','.join('?' * len(primer_ids))
@@ -261,6 +286,10 @@ def add_selected_primers():
         ''', primer_ids)
         rows = cursor.fetchall()
         conn.close()
+        
+        if not rows:
+            flash('No valid primers found with selected IDs.', 'warning')
+            return redirect(url_for('index'))
         
         primer_lines = []
         for row in rows:
