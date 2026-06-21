@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 import os
 import json
@@ -14,7 +13,6 @@ TEMPLATE_DIR = os.path.join(BASE_DIR, 'templates')
 STATIC_DIR = os.path.join(BASE_DIR, 'static')
 DATABASE_PATH = os.path.join(BASE_DIR, 'primers.db')
 BACKUP_DIR = os.path.join(BASE_DIR, 'backups')
-HISTORY_FILE = os.path.join(BASE_DIR, 'history.json')
 
 os.makedirs(TEMPLATE_DIR, exist_ok=True)
 os.makedirs(STATIC_DIR, exist_ok=True)
@@ -198,6 +196,7 @@ def init_db():
         )
     ''')
 
+    # Create default admin user
     admin = c.execute("SELECT * FROM users WHERE username = 'admin'").fetchone()
     if not admin:
         admin_hash = generate_password_hash('admin123')
@@ -465,9 +464,27 @@ def resolve_reset_request(request_id, new_password, admin_id):
     log_audit(admin_id, 'reset_resolved', f"Resolved reset request for {req['username']}")
     return True, "Password reset successfully."
 
+def cancel_reset_request(request_id, admin_id):
+    req = get_reset_request_by_id(request_id)
+    if not req:
+        return False, "Request not found."
+    if req['status'] != 'pending':
+        return False, "Request already processed."
+    conn = get_db()
+    conn.execute(
+        "UPDATE password_reset_requests SET status = 'canceled', resolved_by = ?, resolved_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (admin_id, request_id)
+    )
+    conn.commit()
+    conn.close()
+    log_audit(admin_id, 'reset_canceled', f"Canceled reset request for {req['username']}")
+    return True, "Request canceled."
+
 def create_user(username, password, role='viewer'):
-    if len(username) < 3 or len(password) < 6:
-        return False, "Username and password must be at least 3 and 6 characters."
+    if len(username) < 3:
+        return False, "Username must be at least 3 characters."
+    if len(password) < 6:
+        return False, "Password must be at least 6 characters."
     if get_user_by_username(username):
         return False, "Username already exists."
     conn = get_db()
@@ -558,11 +575,15 @@ def editor_required(f):
 @login_required
 def dashboard():
     user = get_user_by_id(session['user_id'])
-    primers = get_primers(limit=1000)
+    primers = get_primers(limit=1000)   # <-- این خط اضافه شد
     users = get_all_users()
     panels = get_panels()
-    return render_template('dashboard.html', user=user, primers_count=len(primers),
-                           users_count=len(users), panels=panels)
+    return render_template('dashboard.html', 
+                           user=user, 
+                           primers=primers,          # <-- این خط اضافه شد
+                           primers_count=len(primers),
+                           users_count=len(users), 
+                           panels=panels)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -1107,7 +1128,6 @@ def admin_reset_resolve(request_id):
 @app.route('/admin/reset-requests/<int:request_id>/cancel')
 @admin_required
 def admin_reset_cancel(request_id):
-    # Simple cancel - just mark as canceled
     conn = get_db()
     conn.execute(
         "UPDATE password_reset_requests SET status = 'canceled', resolved_by = ?, resolved_at = CURRENT_TIMESTAMP WHERE id = ?",
