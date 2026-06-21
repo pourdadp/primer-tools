@@ -210,3 +210,7 @@ If you encounter any issues or have feature requests, please open an issue on Gi
 🙏 Acknowledgments
 
 Designed with molecular biologists and diagnostic labs in mind. Inspired by real‑world needs for PCR optimization and primer inventory management.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
