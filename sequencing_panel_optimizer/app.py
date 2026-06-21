@@ -41,15 +41,10 @@ def get_history():
 # ==================== پیدا کردن دیتابیس PDM ====================
 
 def find_pdm_database():
-    """پیدا کردن خودکار فایل primers.db در مسیرهای مختلف"""
     possible_paths = [
-        # ساختار استاندارد: primer-tools/sequencing_panel_optimizer/ و primer-tools/primer_database_manager/
         os.path.join(os.path.dirname(BASE_DIR), 'primer_database_manager', 'primers.db'),
-        # اگر SPO و PDM در یک پوشه باشند
         os.path.join(BASE_DIR, 'primers.db'),
-        # اگر از GitHub دانلود شده باشد (primer-tools-main)
         os.path.join(os.path.dirname(os.path.dirname(BASE_DIR)), 'primer_database_manager', 'primers.db'),
-        # مسیر مطلق (برای کاربران خاص)
         r'C:\Users\user\Desktop\primer-tools-main\primer_database_manager\primers.db',
         r'C:\Users\user\Desktop\primer-tools\primer_database_manager\primers.db',
     ]
@@ -62,7 +57,6 @@ def find_pdm_database():
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    # اگر از صفحه انتخاب پرایمر برگشته و داده در session ذخیره شده باشد
     selected_primers = session.pop('selected_primers', None)
     
     if request.method == 'POST':
@@ -203,20 +197,20 @@ def sample_data():
     }
     return jsonify(sample)
 
-# ==================== Load from Database (All Primers) ====================
+# ==================== Load All from Database ====================
 
 @app.route('/load_from_db')
 def load_from_db():
     db_path = find_pdm_database()
     if not db_path:
-        return jsonify({'error': 'Primer database not found. Please run Primer Database Manager first.'}), 404
+        return jsonify({'error': 'Primer database not found.'}), 404
     
     try:
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT name, forward_sequence, reverse_sequence, pair_name
+            SELECT name, forward_sequence, reverse_sequence
             FROM primers WHERE is_active = 1
         ''')
         rows = cursor.fetchall()
@@ -233,13 +227,13 @@ def load_from_db():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# ==================== Select Primers from Database (Individual Selection) ====================
+# ==================== Select Primers from Database ====================
 
 @app.route('/load_from_db_selector')
 def load_from_db_selector():
     db_path = find_pdm_database()
     if not db_path:
-        flash('Primer database not found. Please run Primer Database Manager first and add some primers.', 'danger')
+        flash('Primer database not found. Please run Primer Database Manager first.', 'danger')
         return redirect(url_for('index'))
     
     try:
@@ -255,12 +249,12 @@ def load_from_db_selector():
         conn.close()
         
         if not primers:
-            flash('No primers found in database. Please add some primers using Primer Database Manager.', 'warning')
+            flash('No primers found in database.', 'warning')
             return redirect(url_for('index'))
         
         return render_template('primer_selector.html', primers=primers)
     except Exception as e:
-        flash(f'Error loading primers: {str(e)}', 'danger')
+        flash(f'Error: {str(e)}', 'danger')
         return redirect(url_for('index'))
 
 @app.route('/add_selected_primers', methods=['POST'])
@@ -288,7 +282,7 @@ def add_selected_primers():
         conn.close()
         
         if not rows:
-            flash('No valid primers found with selected IDs.', 'warning')
+            flash('No valid primers found.', 'warning')
             return redirect(url_for('index'))
         
         primer_lines = []
@@ -298,7 +292,6 @@ def add_selected_primers():
             if row['reverse_sequence']:
                 primer_lines.append(f"{row['name']}_R,{row['reverse_sequence']}")
         
-        # ذخیره در session برای انتقال به صفحه اصلی
         session['selected_primers'] = '\n'.join(primer_lines)
         flash(f'{len(rows)} primer(s) loaded successfully.', 'success')
         return redirect(url_for('index'))
