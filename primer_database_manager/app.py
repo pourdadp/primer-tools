@@ -42,10 +42,194 @@ def init_db():
     conn = get_db()
     c = conn.cursor()
 
-    # Create tables (omitted for brevity, but same as before)
-    # ... (all CREATE TABLE statements) ...
+    # Users table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'viewer',
+            is_active BOOLEAN DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            last_login DATETIME
+        )
+    ''')
 
-    # Create admin user if not exists
+    # Primers table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS primers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            forward_sequence TEXT NOT NULL,
+            reverse_sequence TEXT,
+            pair_name TEXT,
+            gene TEXT,
+            organism TEXT,
+            strain_or_serotype TEXT,
+            pcr_type TEXT,
+            amplicon_length INTEGER,
+            estimated_tm REAL,
+            experimental_tm REAL,
+            reference TEXT,
+            diagnostic_limitations TEXT,
+            for_sequencing BOOLEAN DEFAULT 0,
+            for_diagnosis BOOLEAN DEFAULT 0,
+            binding_region TEXT,
+            binding_detail TEXT,
+            stock_concentration REAL,
+            working_volume_per_reaction REAL,
+            general_notes TEXT,
+            is_active BOOLEAN DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            added_by INTEGER,
+            FOREIGN KEY (added_by) REFERENCES users(id)
+        )
+    ''')
+
+    # Probes table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS probes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pair_name TEXT NOT NULL,
+            sequence TEXT NOT NULL,
+            probe_type TEXT,
+            reporter TEXT,
+            quencher TEXT,
+            modifications TEXT,
+            notes TEXT,
+            FOREIGN KEY (pair_name) REFERENCES primers(pair_name) ON DELETE CASCADE
+        )
+    ''')
+
+    # Custom fields table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS custom_fields (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            primer_id INTEGER NOT NULL,
+            field_name TEXT NOT NULL,
+            field_value TEXT,
+            FOREIGN KEY (primer_id) REFERENCES primers(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # PCR programs table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS pcr_programs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pair_name TEXT NOT NULL,
+            program_name TEXT NOT NULL,
+            is_default BOOLEAN DEFAULT 0,
+            program_type TEXT,
+            reaction_volume REAL,
+            master_mix TEXT,
+            notes TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (pair_name) REFERENCES primers(pair_name) ON DELETE CASCADE
+        )
+    ''')
+
+    # PCR steps table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS pcr_steps (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            program_id INTEGER NOT NULL,
+            step_order INTEGER NOT NULL,
+            step_type TEXT NOT NULL,
+            temperature REAL,
+            duration_sec INTEGER,
+            cycle_repeat INTEGER,
+            is_cycle_start BOOLEAN DEFAULT 0,
+            is_cycle_end BOOLEAN DEFAULT 0,
+            is_read_step BOOLEAN DEFAULT 0,
+            FOREIGN KEY (program_id) REFERENCES pcr_programs(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # Reaction panels table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS reaction_panels (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            panel_name TEXT UNIQUE NOT NULL,
+            description TEXT,
+            organism TEXT,
+            created_by INTEGER,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (created_by) REFERENCES users(id)
+        )
+    ''')
+
+    # Panel primers table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS panel_primers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            panel_id INTEGER NOT NULL,
+            primer_id INTEGER NOT NULL,
+            probe_id INTEGER,
+            working_volume_per_reaction REAL,
+            final_concentration REAL,
+            FOREIGN KEY (panel_id) REFERENCES reaction_panels(id) ON DELETE CASCADE,
+            FOREIGN KEY (primer_id) REFERENCES primers(id) ON DELETE CASCADE,
+            FOREIGN KEY (probe_id) REFERENCES probes(id) ON DELETE SET NULL
+        )
+    ''')
+
+    # Password reset requests table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS password_reset_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            requested_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            resolved_at DATETIME,
+            status TEXT DEFAULT 'pending',
+            resolved_by INTEGER,
+            new_password_hash TEXT,
+            admin_notes TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (resolved_by) REFERENCES users(id)
+        )
+    ''')
+
+    # Editing locks table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS editing_locks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            primer_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            locked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            expires_at DATETIME,
+            FOREIGN KEY (primer_id) REFERENCES primers(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    ''')
+
+    # Audit log table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            action TEXT NOT NULL,
+            details TEXT,
+            ip_address TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    ''')
+
+    # --- NEW: Primer aliases table for duplicate sequences ---
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS primer_aliases (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            primer_id INTEGER NOT NULL,
+            alias_name TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (primer_id) REFERENCES primers(id) ON DELETE CASCADE,
+            UNIQUE(primer_id, alias_name)
+        )
+    ''')
+
+    # Create default admin user
     admin = c.execute("SELECT * FROM users WHERE username = 'admin'").fetchone()
     if not admin:
         admin_hash = generate_password_hash('admin123')
@@ -54,6 +238,7 @@ def init_db():
             ('admin', admin_hash, 'admin')
         )
 
+    # Trigger for updated_at
     c.execute('''
         CREATE TRIGGER IF NOT EXISTS update_primer_timestamp
         AFTER UPDATE ON primers
@@ -120,13 +305,50 @@ def get_primer_by_name(name):
     return primer
 
 def get_primer_by_pair_name(pair_name):
-    """Get the first primer (by id) that belongs to the given pair_name."""
     if not pair_name:
         return None
     conn = get_db()
     primer = conn.execute("SELECT * FROM primers WHERE pair_name = ? LIMIT 1", (pair_name,)).fetchone()
     conn.close()
     return primer
+
+def get_aliases(primer_id):
+    conn = get_db()
+    aliases = conn.execute("SELECT * FROM primer_aliases WHERE primer_id = ?", (primer_id,)).fetchall()
+    conn.close()
+    return aliases
+
+def add_alias_to_primer(primer_id, alias_name):
+    conn = get_db()
+    try:
+        conn.execute(
+            "INSERT INTO primer_aliases (primer_id, alias_name) VALUES (?, ?)",
+            (primer_id, alias_name.strip())
+        )
+        conn.commit()
+        conn.close()
+        return True, "Alias added successfully."
+    except sqlite3.IntegrityError:
+        conn.close()
+        return False, "This alias already exists for this primer."
+
+def check_duplicate_sequence(forward_seq, reverse_seq=None, exclude_id=None):
+    """Check if the same sequence already exists in the database."""
+    conn = get_db()
+    query = "SELECT id, name, forward_sequence, reverse_sequence FROM primers WHERE is_active = 1"
+    params = []
+    if exclude_id:
+        query += " AND id != ?"
+        params.append(exclude_id)
+    primers = conn.execute(query, params).fetchall()
+    conn.close()
+
+    for p in primers:
+        if p['forward_sequence'] == forward_seq:
+            return True, p['id'], p['name'], "forward"
+        if reverse_seq and p['reverse_sequence'] == reverse_seq:
+            return True, p['id'], p['name'], "reverse"
+    return False, None, None, None
 
 def get_custom_fields(primer_id):
     conn = get_db()
@@ -527,16 +749,34 @@ def primer_add():
             'working_volume_per_reaction': request.form.get('working_volume_per_reaction', type=float),
             'general_notes': request.form.get('general_notes'),
         }
+
         if not data['name'] or not data['forward_sequence']:
             flash('Name and Forward Sequence are required.', 'danger')
             return render_template('primer_add.html')
+
         if not is_valid_sequence(data['forward_sequence']):
             flash('Forward Sequence contains invalid characters.', 'danger')
             return render_template('primer_add.html')
+
         if get_primer_by_name(data['name']):
             flash('Primer with this name already exists.', 'danger')
             return render_template('primer_add.html')
 
+        # --- Duplicate sequence check ---
+        duplicate, existing_id, existing_name, direction = check_duplicate_sequence(
+            data['forward_sequence'], data['reverse_sequence']
+        )
+
+        if duplicate and request.form.get('confirm_duplicate') != 'yes':
+            # Show warning and ask for alias
+            flash(f'This forward sequence already exists in primer "{existing_name}". Do you want to add a new name (alias) to it?', 'warning')
+            return render_template('primer_add.html',
+                                   duplicate=True,
+                                   existing_name=existing_name,
+                                   existing_id=existing_id,
+                                   form_data=data)
+
+        # Calculate Tm if empty
         if not data['estimated_tm'] and data['forward_sequence']:
             data['estimated_tm'] = calculate_tm(data['forward_sequence'])
 
@@ -562,6 +802,7 @@ def primer_add():
         ))
         primer_id = c.lastrowid
 
+        # Custom fields
         custom_names = request.form.getlist('custom_field_name')
         custom_values = request.form.getlist('custom_field_value')
         for name, value in zip(custom_names, custom_values):
@@ -570,12 +811,24 @@ def primer_add():
                     "INSERT INTO custom_fields (primer_id, field_name, field_value) VALUES (?, ?, ?)",
                     (primer_id, name, value)
                 )
+
+        # If duplicate and user confirmed, add alias to existing primer
+        if duplicate and request.form.get('confirm_duplicate') == 'yes':
+            alias_name = request.form.get('alias_name')
+            if alias_name and alias_name.strip():
+                success, msg = add_alias_to_primer(existing_id, alias_name.strip())
+                flash(f'Primer added successfully. Alias "{alias_name}" added to existing primer "{existing_name}".', 'success')
+            else:
+                flash('Primer added, but no alias provided.', 'warning')
+
         conn.commit()
         conn.close()
 
         log_audit(session['user_id'], 'primer_added', f"Added primer {data['name']}")
-        flash('Primer added successfully.', 'success')
+        if not duplicate:
+            flash('Primer added successfully.', 'success')
         return redirect(url_for('primer_detail', primer_id=primer_id))
+
     return render_template('primer_add.html')
 
 @app.route('/primers/<int:primer_id>')
@@ -589,6 +842,7 @@ def primer_detail(primer_id):
     probes = get_probes_by_pair(primer['pair_name']) if primer['pair_name'] else []
     programs = get_pcr_programs_by_pair(primer['pair_name']) if primer['pair_name'] else []
     lock = get_editing_lock(primer_id)
+    aliases = get_aliases(primer_id)
 
     programs_with_steps = []
     for prog in programs:
@@ -596,7 +850,7 @@ def primer_detail(primer_id):
         programs_with_steps.append({'program': prog, 'steps': steps})
 
     return render_template('primer_detail.html', primer=primer, custom_fields=custom_fields,
-                           probes=probes, programs=programs_with_steps, lock=lock)
+                           probes=probes, programs=programs_with_steps, lock=lock, aliases=aliases)
 
 @app.route('/primers/<int:primer_id>/edit', methods=['GET', 'POST'])
 @editor_required
@@ -643,9 +897,11 @@ def primer_edit(primer_id):
             'working_volume_per_reaction': request.form.get('working_volume_per_reaction', type=float),
             'general_notes': request.form.get('general_notes'),
         }
+
         if not data['name'] or not data['forward_sequence']:
             flash('Name and Forward Sequence are required.', 'danger')
             return render_template('primer_edit.html', primer=primer)
+
         if not is_valid_sequence(data['forward_sequence']):
             flash('Forward Sequence contains invalid characters.', 'danger')
             return render_template('primer_edit.html', primer=primer)
@@ -676,6 +932,7 @@ def primer_edit(primer_id):
             data['working_volume_per_reaction'], data['general_notes'],
             primer_id
         ))
+
         c.execute("DELETE FROM custom_fields WHERE primer_id = ?", (primer_id,))
         custom_names = request.form.getlist('custom_field_name')
         custom_values = request.form.getlist('custom_field_value')
@@ -685,6 +942,7 @@ def primer_edit(primer_id):
                     "INSERT INTO custom_fields (primer_id, field_name, field_value) VALUES (?, ?, ?)",
                     (primer_id, name, value)
                 )
+
         conn.commit()
         conn.close()
 
@@ -735,7 +993,7 @@ def pcr_program_edit(program_id):
 
     primer = get_primer_by_pair_name(program['pair_name'])
     if not primer:
-        flash('Associated primer not found. Please check the pair_name.', 'danger')
+        flash('Associated primer not found.', 'danger')
         return redirect(url_for('primer_list'))
     primer_id = primer['id']
 
@@ -753,33 +1011,54 @@ def pcr_program_edit(program_id):
                 master_mix = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         ''', (program_name, program_type, reaction_volume, master_mix, notes, program_id))
+
+        # Delete old steps
         conn.execute("DELETE FROM pcr_steps WHERE program_id = ?", (program_id,))
 
+        # Get step data from form
         step_types = request.form.getlist('step_type[]')
         temperatures = request.form.getlist('temperature[]')
         durations = request.form.getlist('duration_sec[]')
         cycle_repeats = request.form.getlist('cycle_repeat[]')
         is_reads = request.form.getlist('is_read_step[]')
 
-        for i, (stype, temp, dur, cycle, is_read) in enumerate(zip(step_types, temperatures, durations, cycle_repeats, is_reads)):
-            if not stype:
+        # Insert new steps
+        for i in range(len(step_types)):
+            step_type = step_types[i].strip()
+            if not step_type:
                 continue
+
+            temp = temperatures[i].strip() if i < len(temperatures) else ''
+            dur = durations[i].strip() if i < len(durations) else ''
+            cycle = cycle_repeats[i].strip() if i < len(cycle_repeats) else ''
+            is_read = 'on' in is_reads[i] if i < len(is_reads) else False
+
             conn.execute('''
                 INSERT INTO pcr_steps (
                     program_id, step_order, step_type, temperature,
                     duration_sec, cycle_repeat, is_read_step
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (program_id, i+1, stype, float(temp) if temp else None,
-                  int(dur) if dur else None, int(cycle) if cycle else None,
-                  1 if is_read else 0))
+            ''', (
+                program_id,
+                i + 1,
+                step_type,
+                float(temp) if temp else None,
+                int(dur) if dur else None,
+                int(cycle) if cycle else None,
+                1 if is_read else 0
+            ))
+
         conn.commit()
         conn.close()
 
-        flash('Program updated.', 'success')
+        flash('Program updated successfully.', 'success')
         return redirect(url_for('primer_detail', primer_id=primer_id))
 
     steps = get_pcr_steps(program_id)
-    return render_template('pcr_program_edit.html', program=program, steps=steps, primer_id=primer_id)
+    return render_template('pcr_program_edit.html',
+                           program=program,
+                           steps=steps,
+                           primer_id=primer_id)
 
 @app.route('/programs/add', methods=['POST'])
 @editor_required
