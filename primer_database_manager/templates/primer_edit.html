@@ -19,7 +19,6 @@
 {% endif %}
 
 <form method="POST" class="row g-3">
-    <!-- Hidden lock check -->
     <input type="hidden" name="lock_check" value="1">
 
     <div class="col-md-6">
@@ -31,7 +30,6 @@
         <input type="text" class="form-control" name="pair_name" value="{{ primer.pair_name or '' }}">
     </div>
 
-    <!-- Sequences with readonly toggle -->
     <div class="col-md-6">
         <label class="form-label">Forward Sequence *</label>
         <div class="input-group">
@@ -132,7 +130,6 @@
         </div>
     </div>
 
-    <!-- Custom Fields -->
     <div class="col-12">
         <h5>📝 Custom Fields</h5>
         <div id="customFields">
@@ -160,7 +157,6 @@
 </form>
 
 <script>
-    // Manage custom fields
     function addCustomField() {
         const container = document.getElementById('customFields');
         const row = document.createElement('div');
@@ -183,7 +179,6 @@
         btn.closest('.custom-field-row').remove();
     }
 
-    // Toggle readonly for sequence fields
     function toggleReadonly(fieldId) {
         const input = document.getElementById(fieldId);
         const isReadonly = input.hasAttribute('readonly');
@@ -200,7 +195,6 @@
         }
     }
 
-    // Initialise button texts on load
     document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.sequence').forEach(function(input) {
             if (input.hasAttribute('readonly')) {
