@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 import os
 import sys
@@ -6,8 +5,9 @@ import json
 import shutil
 import subprocess
 import yaml
+import sqlite3
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, send_from_directory, jsonify
+from flask import Flask, render_template, request, redirect, url_for, send_from_directory, jsonify, session, flash
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_DIR = os.path.join(BASE_DIR, 'templates')
@@ -15,11 +15,15 @@ SCRIPT_DIR = os.path.join(BASE_DIR, 'scripts')
 UPLOAD_DIR = os.path.join(BASE_DIR, 'results')
 HISTORY_FILE = os.path.join(BASE_DIR, 'history.json')
 
+# مسیر دیتابیس Primer Database Manager
+PDM_DB_PATH = os.path.join(os.path.dirname(BASE_DIR), 'primer_database_manager', 'primers.db')
+
 os.makedirs(TEMPLATE_DIR, exist_ok=True)
 os.makedirs(SCRIPT_DIR, exist_ok=True)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 app = Flask(__name__, template_folder=TEMPLATE_DIR)
+app.secret_key = 'spo-secret-key-change-in-production'
 app.config['UPLOAD_FOLDER'] = UPLOAD_DIR
 
 if not os.path.exists(HISTORY_FILE):
@@ -37,8 +41,13 @@ def get_history():
     with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
         return json.load(f)
 
+# ==================== Routes ====================
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
+    # اگر از صفحه انتخاب پرایمر برگشته و داده در session ذخیره شده باشد
+    selected_primers = session.pop('selected_primers', None)
+    
     if request.method == 'POST':
         dna_sequence = request.form['dna_sequence']
         max_mispairing = int(request.form['max_mispairing'])
@@ -126,7 +135,7 @@ def index():
         
         return redirect(url_for('results', run_id=timestamp))
     
-    return render_template('index.html')
+    return render_template('index.html', selected_primers=selected_primers)
 
 @app.route('/results/<run_id>')
 def results(run_id):
@@ -177,16 +186,15 @@ def sample_data():
     }
     return jsonify(sample)
 
-# ==================== API to load primers from database ====================
+# ==================== Load from Database (All Primers) ====================
+
 @app.route('/load_from_db')
 def load_from_db():
-    db_path = os.path.join(os.path.dirname(BASE_DIR), 'primer_database_manager', 'primers.db')
-    if not os.path.exists(db_path):
+    if not os.path.exists(PDM_DB_PATH):
         return jsonify({'error': 'Primer database not found. Please run Primer Database Manager first.'}), 404
     
     try:
-        import sqlite3
-        conn = sqlite3.connect(db_path)
+        conn = sqlite3.connect(PDM_DB_PATH)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute('''
@@ -206,6 +214,68 @@ def load_from_db():
         return jsonify({'primers': '\n'.join(primer_lines)})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# ==================== Select Primers from Database (Individual Selection) ====================
+
+@app.route('/load_from_db_selector')
+def load_from_db_selector():
+    if not os.path.exists(PDM_DB_PATH):
+        flash('Primer database not found. Please run Primer Database Manager first.', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        conn = sqlite3.connect(PDM_DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT id, name, forward_sequence, reverse_sequence, pair_name, gene, organism
+            FROM primers WHERE is_active = 1
+            ORDER BY name
+        ''')
+        primers = cursor.fetchall()
+        conn.close()
+        return render_template('primer_selector.html', primers=primers)
+    except Exception as e:
+        flash(f'Error loading primers: {str(e)}', 'danger')
+        return redirect(url_for('index'))
+
+@app.route('/add_selected_primers', methods=['POST'])
+def add_selected_primers():
+    primer_ids = request.form.getlist('primer_ids')
+    if not primer_ids:
+        flash('No primers selected.', 'warning')
+        return redirect(url_for('index'))
+    
+    if not os.path.exists(PDM_DB_PATH):
+        flash('Primer database not found.', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        conn = sqlite3.connect(PDM_DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        placeholders = ','.join('?' * len(primer_ids))
+        cursor.execute(f'''
+            SELECT name, forward_sequence, reverse_sequence
+            FROM primers WHERE id IN ({placeholders}) AND is_active = 1
+        ''', primer_ids)
+        rows = cursor.fetchall()
+        conn.close()
+        
+        primer_lines = []
+        for row in rows:
+            if row['forward_sequence']:
+                primer_lines.append(f"{row['name']}_F,{row['forward_sequence']}")
+            if row['reverse_sequence']:
+                primer_lines.append(f"{row['name']}_R,{row['reverse_sequence']}")
+        
+        # ذخیره در session برای انتقال به صفحه اصلی
+        session['selected_primers'] = '\n'.join(primer_lines)
+        flash(f'{len(rows)} primer(s) loaded successfully.', 'success')
+        return redirect(url_for('index'))
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'danger')
+        return redirect(url_for('index'))
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
