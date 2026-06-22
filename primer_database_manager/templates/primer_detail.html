@@ -1,74 +1,181 @@
-<!-- PCR Programs -->
-<h5 class="mt-3">🧪 PCR Programs</h5>
-{% for prog in programs %}
-<div class="card mt-2">
-    <div class="card-header">
-        <strong>{{ prog.program.program_name }}</strong>
-        {% if prog.program.is_default %} ⭐ (Default){% endif %}
-        <span class="badge bg-secondary">{{ prog.program.program_type or 'PCR' }}</span>
-        <div class="float-end no-print">
-            <a href="{{ url_for('pcr_program_edit', program_id=prog.program.id) }}" class="btn btn-sm btn-warning">Edit</a>
-            <a href="{{ url_for('pcr_program_set_default', program_id=prog.program.id) }}" class="btn btn-sm btn-info">Set Default</a>
-            <a href="{{ url_for('pcr_program_delete', program_id=prog.program.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('Delete program?')">Delete</a>
-        </div>
-    </div>
-    <div class="card-body">
-        <table class="table table-sm">
-            <thead>
-                <tr>
-                    <th>Step</th>
-                    <th>Type</th>
-                    <th>Temp</th>
-                    <th>Time</th>
-                    <th>Cycle</th>
-                    <th>Read</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for step in prog.steps %}
-                <tr>
-                    <td>{{ step.step_order }}</td>
-                    <td>{{ step.step_type }}</td>
-                    <td>{{ step.temperature or '-' }} °C</td>
-                    <td>
-                        {% set mins = (step.duration_sec // 60) if step.duration_sec else 0 %}
-                        {% set secs = (step.duration_sec % 60) if step.duration_sec else 0 %}
-                        {% if mins > 0 %}{{ mins }}m {% endif %}{{ secs }}s
-                    </td>
-                    <td>
-                        {% if step.cycle_group_id %}
-                            Cycle {{ step.cycle_number or '?' }} ({{ step.repeat_count or 1 }}x)
-                        {% else %}
-                            -
-                        {% endif %}
-                    </td>
-                    <td>{{ 'Yes' if step.is_read_step else 'No' }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <div class="mt-2">
-            <strong>Type:</strong> {{ prog.program.program_type or 'N/A' }} &nbsp;|&nbsp;
-            <strong>Volume:</strong> {{ prog.program.reaction_volume or 'N/A' }} µL &nbsp;|&nbsp;
-            <strong>Master Mix:</strong> {{ prog.program.master_mix or 'N/A' }}
-            {% if prog.program.notes %}
-            <br><strong>Notes:</strong> {{ prog.program.notes }}
-            {% endif %}
-        </div>
+{% extends "base.html" %}
+{% block title %}Primer Details{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center">
+    <h2>🔍 Primer: {{ primer.name }}</h2>
+    <div class="no-print">
+        <a href="{{ url_for('primer_edit', primer_id=primer.id) }}" class="btn btn-warning">✏️ Edit</a>
+        {% if session.role == 'admin' %}
+        <a href="{{ url_for('primer_delete', primer_id=primer.id) }}" class="btn btn-danger" onclick="return confirm('Delete this primer?')">🗑️ Delete</a>
+        {% endif %}
+        <button class="btn btn-success" onclick="window.print()">🖨️ Print</button>
     </div>
 </div>
-{% else %}
-<p class="text-muted">No PCR programs.</p>
-{% endfor %}
 
-<!-- Add PCR Program Form -->
-<form method="POST" action="{{ url_for('pcr_program_add') }}" class="mt-2 no-print">
-    <input type="hidden" name="primer_id" value="{{ primer.id }}">
-    <div class="input-group">
-        <input type="text" class="form-control" name="program_name" placeholder="New program name" required>
-        <div class="input-group-text">
-            <input type="checkbox" name="is_default"> Default
-        </div>
-        <button type="submit" class="btn btn-primary">Add Program</button>
+{% if lock %}
+<div class="alert alert-warning no-print">
+    🔒 Being edited by {{ lock.username }}.
+    {% if session.role == 'admin' %}
+    <a href="{{ url_for('primer_unlock', primer_id=primer.id) }}" class="btn btn-sm btn-danger">Break Lock (Admin)</a>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- ==================== اطلاعات پرایمر ==================== -->
+<div class="row mt-3">
+    <!-- ستون اول: اطلاعات اصلی پرایمر -->
+    <div class="col-md-6">
+        <table class="table table-bordered">
+            <tr><th>Name</th><td>{{ primer.name }}</td></tr>
+            <tr><th>Pair Name</th><td>{{ primer.pair_name or '-' }}</td></tr>
+            <tr><th>Forward Sequence</th><td class="sequence">{{ primer.forward_sequence }}</td></tr>
+            <tr><th>Reverse Sequence</th><td class="sequence">{{ primer.reverse_sequence or '-' }}</td></tr>
+            <tr><th>Gene</th><td>{{ primer.gene or '-' }}</td></tr>
+            <tr><th>Organism</th><td>{{ primer.organism or '-' }}</td></tr>
+            <tr><th>Strain/Serotype</th><td>{{ primer.strain_or_serotype or '-' }}</td></tr>
+            <tr><th>PCR Type</th><td>{{ primer.pcr_type or '-' }}</td></tr>
+            <tr><th>Amplicon Length</th><td>{{ primer.amplicon_length or '-' }} bp</td></tr>
+            <tr><th>Estimated Tm</th><td>{{ primer.estimated_tm or '-' }} °C</td></tr>
+            <tr><th>Experimental Tm</th><td>{{ primer.experimental_tm or '-' }} °C</td></tr>
+            <tr><th>Reference</th><td>{{ primer.reference or '-' }}</td></tr>
+            <tr><th>Diagnostic Limitations</th><td>{{ primer.diagnostic_limitations or '-' }}</td></tr>
+            <tr><th>For Sequencing</th><td>{{ 'Yes' if primer.for_sequencing else 'No' }}</td></tr>
+            <tr><th>For Diagnosis</th><td>{{ 'Yes' if primer.for_diagnosis else 'No' }}</td></tr>
+            <tr><th>Binding Region</th><td>{{ primer.binding_region or '-' }}</td></tr>
+            <tr><th>Binding Detail</th><td>{{ primer.binding_detail or '-' }}</td></tr>
+            <tr><th>Stock Concentration</th><td>{{ primer.stock_concentration or '-' }} µM</td></tr>
+            <tr><th>Working Volume</th><td>{{ primer.working_volume_per_reaction or '-' }} µL</td></tr>
+            <tr><th>Notes</th><td>{{ primer.general_notes or '-' }}</td></tr>
+            <tr><th>Created</th><td>{{ primer.created_at }}</td></tr>
+            <tr><th>Updated</th><td>{{ primer.updated_at }}</td></tr>
+        </table>
+
+        <!-- Aliases -->
+        <h5>📛 Alternative Names (Aliases)</h5>
+        <ul>
+            {% for alias in aliases %}
+            <li>{{ alias.alias_name }}</li>
+            {% else %}
+            <li class="text-muted">No aliases.</li>
+            {% endfor %}
+        </ul>
     </div>
-</form>
+
+    <!-- ستون دوم: فیلدهای سفارشی، پراب‌ها و برنامه‌های PCR -->
+    <div class="col-md-6">
+        <!-- Custom Fields -->
+        <h5>📝 Custom Fields</h5>
+        <ul>
+            {% for field in custom_fields %}
+            <li><strong>{{ field.field_name }}:</strong> {{ field.field_value }}</li>
+            {% else %}
+            <li class="text-muted">No custom fields.</li>
+            {% endfor %}
+        </ul>
+
+        <!-- Probes -->
+        <h5>🔬 Probes</h5>
+        <ul>
+            {% for probe in probes %}
+            <li>
+                <strong>{{ probe.probe_type or 'Probe' }}</strong> – {{ probe.sequence }}<br>
+                Reporter: {{ probe.reporter or '-' }}, Quencher: {{ probe.quencher or '-' }}
+                <a href="{{ url_for('probe_delete', probe_id=probe.id) }}" class="btn btn-sm btn-danger no-print" onclick="return confirm('Delete probe?')">Delete</a>
+            </li>
+            {% else %}
+            <li class="text-muted">No probes.</li>
+            {% endfor %}
+        </ul>
+
+        <!-- Add Probe Form -->
+        <form method="POST" action="{{ url_for('probe_add') }}" class="no-print">
+            <input type="hidden" name="pair_name" value="{{ primer.pair_name }}">
+            <div class="row g-2">
+                <div class="col-4"><input type="text" class="form-control" name="sequence" placeholder="Sequence" required></div>
+                <div class="col-3"><input type="text" class="form-control" name="probe_type" placeholder="Type"></div>
+                <div class="col-2"><input type="text" class="form-control" name="reporter" placeholder="Reporter"></div>
+                <div class="col-3"><input type="text" class="form-control" name="quencher" placeholder="Quencher"></div>
+            </div>
+            <div class="row g-2 mt-1">
+                <div class="col-8"><input type="text" class="form-control" name="modifications" placeholder="Modifications"></div>
+                <div class="col-4"><button type="submit" class="btn btn-sm btn-success w-100">Add Probe</button></div>
+            </div>
+        </form>
+
+        <!-- ==================== PCR Programs ==================== -->
+        <h5 class="mt-3">🧪 PCR Programs</h5>
+        {% for prog in programs %}
+        <div class="card mt-2">
+            <div class="card-header">
+                <strong>{{ prog.program.program_name }}</strong>
+                {% if prog.program.is_default %} ⭐ (Default){% endif %}
+                <span class="badge bg-secondary">{{ prog.program.program_type or 'PCR' }}</span>
+                <div class="float-end no-print">
+                    <a href="{{ url_for('pcr_program_edit', program_id=prog.program.id) }}" class="btn btn-sm btn-warning">Edit</a>
+                    <a href="{{ url_for('pcr_program_set_default', program_id=prog.program.id) }}" class="btn btn-sm btn-info">Set Default</a>
+                    <a href="{{ url_for('pcr_program_delete', program_id=prog.program.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('Delete program?')">Delete</a>
+                </div>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Step</th>
+                            <th>Type</th>
+                            <th>Temp</th>
+                            <th>Time</th>
+                            <th>Cycle</th>
+                            <th>Read</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for step in prog.steps %}
+                        <tr>
+                            <td>{{ step.step_order }}</td>
+                            <td>{{ step.step_type }}</td>
+                            <td>{{ step.temperature or '-' }} °C</td>
+                            <td>
+                                {% set mins = (step.duration_sec // 60) if step.duration_sec else 0 %}
+                                {% set secs = (step.duration_sec % 60) if step.duration_sec else 0 %}
+                                {% if mins > 0 %}{{ mins }}m {% endif %}{{ secs }}s
+                            </td>
+                            <td>
+                                {% if step.cycle_group_id %}
+                                    Cycle {{ step.cycle_number or '?' }} ({{ step.repeat_count or 1 }}x)
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>{{ 'Yes' if step.is_read_step else 'No' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <div class="mt-2">
+                    <strong>Type:</strong> {{ prog.program.program_type or 'N/A' }} &nbsp;|&nbsp;
+                    <strong>Volume:</strong> {{ prog.program.reaction_volume or 'N/A' }} µL &nbsp;|&nbsp;
+                    <strong>Master Mix:</strong> {{ prog.program.master_mix or 'N/A' }}
+                    {% if prog.program.notes %}
+                    <br><strong>Notes:</strong> {{ prog.program.notes }}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <p class="text-muted">No PCR programs.</p>
+        {% endfor %}
+
+        <!-- Add PCR Program Form -->
+        <form method="POST" action="{{ url_for('pcr_program_add') }}" class="mt-2 no-print">
+            <input type="hidden" name="primer_id" value="{{ primer.id }}">
+            <div class="input-group">
+                <input type="text" class="form-control" name="program_name" placeholder="New program name" required>
+                <div class="input-group-text">
+                    <input type="checkbox" name="is_default"> Default
+                </div>
+                <button type="submit" class="btn btn-primary">Add Program</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
