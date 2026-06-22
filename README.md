@@ -1,200 +1,240 @@
-🧬 Primer Tools Suite
+```markdown
+# 🧬 Primer Tools – Complete Molecular Biology Suite
 
-A comprehensive, open‑source toolkit for PCR primer panel optimization and primer database management.
+A comprehensive toolkit for molecular biology laboratories: primer management, PCR protocol design, and targeted sequencing panel optimization.
 
-This repository contains two powerful tools designed for molecular biologists and bioinformaticians:
-
-· Sequencing Panel Optimizer (SPO) – Select the best combination of existing primers to generate overlapping amplicons for full‑length targeted sequencing.
-· Primer Database Manager (PDM) – A complete web‑based system to manage primers, probes, PCR programs, and multiplex panels.
-
----
-
-🔬 1. Sequencing Panel Optimizer (SPO)
-
-Optimize your primer panels for targeted sequencing by selecting the most efficient set from your existing primer inventory.
-
-Key Features
-
-· Sequence Analysis – Paste your target DNA sequence and get instant results.
-· Flexible Primer Loading – Manually enter primers or load them directly from the Primer Database Manager.
-· Automatic Direction Detection – Identifies whether primers bind in Forward or Reverse orientation.
-· Full IUPAC & Inosine Support – Handles degenerate primers (e.g., R, Y, N, I) without errors.
-· Smart Filtering – Rejects primers that bind to multiple sites or in both directions.
-· Amplicon Length Control – User‑defined min/max product length.
-· Tm & Dimer Checks – Validates primer compatibility and prevents dimer formation.
-· Greedy Coverage Optimization – Finds the optimal set of primers to cover the entire target with minimal amplicons.
-· Visualization – Generates a graphical map of primer binding sites.
-· Downloadable Reports – Export results as JSON (binding results, valid pairs, optimal panel).
-· History Tracking – Logs all runs with status and parameters.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/)
+[![Flask](https://img.shields.io/badge/Flask-3.0-lightgrey.svg)](https://flask.palletsprojects.com/)
+[![Bootstrap](https://img.shields.io/badge/Bootstrap-5-purple.svg)](https://getbootstrap.com/)
 
 ---
 
-🗄️ 2. Primer Database Manager (PDM)
+## 📖 Overview
 
-A fully‑featured web application to manage your primer inventory, probes, and PCR programs.
+**Primer Tools** is a suite of two integrated web applications designed by a molecular biologist with 18+ years of laboratory experience. These tools address real-world needs in diagnostic and research labs:
 
-Key Features
+| Tool | Purpose | Key Users |
+|------|---------|-----------|
+| 🧬 **Primer Database Manager (PDM)** | Centralized primer/probe inventory & PCR protocol design | Lab technicians, Researchers |
+| 🧬 **Sequencing Panel Optimizer (SPO)** | Optimize primer panels for full-length targeted sequencing | Bioinformaticians, NGS specialists |
 
-👥 User Management
-
-· Multi‑user roles: Admin, Editor, Viewer.
-· Admin can create/disable users and change roles.
-· Secure password hashing (Werkzeug).
-· Password Reset – Users request a reset; Admin receives a notification and sets a new password (no email required).
-
-🧬 Primer Management
-
-· Full CRUD (Create, Read, Update, Delete) for primers.
-· Store detailed metadata: Gene, Organism, Strain/Serotype, Tm (estimated/experimental), Amplicon length, Binding region, and more.
-· Editing Lock – Prevents simultaneous edits (one user at a time). Admin can break the lock.
-· Custom Fields – Add dynamic key‑value fields to any primer.
-
-🔬 Probe Management
-
-· Store probes with separate fields for Reporter and Quencher.
-· Supports probe type, modifications, and notes.
-
-🧪 PCR Program Designer
-
-· Store multiple PCR programs per primer pair.
-· Default Program selection.
-· Define steps: Denaturation, Annealing, Extension, Reverse Transcription, Melt Curve, Hold.
-· Mark steps for Real‑Time data acquisition (Read Step).
-· Schematic Visualization – Graphical timeline of the PCR protocol using Chart.js.
-· Linear Text Output – Displays the program as a step‑by‑step text protocol.
-
-📋 Multiplex Panels
-
-· Group multiple primer pairs (and probes) into single reaction panels.
-
-💾 Backup & Restore
-
-· One‑click backup of the entire SQLite database.
-· Auto‑cleanup of backups older than 30 days.
-· Restore any previous backup directly from the interface.
-
-🖨️ Print Compatibility
-
-· All pages (except login) are optimized for A4 printing.
-· Print button available; non‑essential elements are hidden automatically.
+Both tools work together seamlessly: **manage primers in PDM → optimize panels in SPO**.
 
 ---
 
-🔗 Integration Between Tools
+## 🧬 Primer Database Manager (PDM)
 
-The Sequencing Panel Optimizer can directly import primers from the Primer Database Manager.
+### What it does
+A full-featured LIMS-style application for managing primers, probes, and PCR programs with multi-user support.
 
-· In SPO, click the "📂 Load All from Database" button to load all primers, or use "🔍 Select from Database" to pick specific ones.
-· SPO fetches active primers (name and sequence) from the shared primers.db file.
-· This creates a seamless workflow: Manage → Optimize → Sequence.
+### ✨ Highlights
+- 👥 **User roles**: Admin, Editor, Viewer with secure authentication
+- 🧪 **Primer CRUD** with detailed metadata (Gene, Organism, Tm, Amplicon length, etc.)
+- 🔬 **Probe management** with Reporter/Quencher tracking
+- 🧪 **PCR Program Designer** with cycle groups, temperature steps, and Real-Time read detection
+- 📋 **Multiplex Panels** – Group multiple primer pairs into single reactions
+- 🔒 **Editing Lock** – Prevents simultaneous edits; Admin can break locks
+- 🏷️ **Custom Fields & Aliases** – Flexible metadata for any primer
+- 💾 **One-click Backup & Restore** with auto-cleanup (30 days)
+- 🖨️ **Print-optimized** pages (A4)
+- 📊 **Audit Log** – Track all user actions
 
----
+### 📂 Location
+`/primer_database_manager/`
 
-⚙️ Installation & Setup
-
-Prerequisites
-
-· Python 3.8 or higher (download from python.org).
-· Important: During Python installation, check "Add Python to PATH".
-
-Step 1: Clone or Download
-
+### 🚀 Quick Start
 ```bash
-git clone https://github.com/pourdadp/primer-tools.git
-cd primer-tools
+cd primer_database_manager
+pip install -r requirements.txt
+python app.py
+# Open http://127.0.0.1:5001
+# Login: admin / admin123
 ```
 
-Step 2: Install Dependencies
+---
 
-Each tool has its own install.bat (Windows) or you can use pip manually.
+🧬 Sequencing Panel Optimizer (SPO)
 
-For Sequencing Panel Optimizer:
+What it does
+
+Select the best combination of existing primers to generate overlapping amplicons for full-length targeted sequencing (e.g., viral genomes, gene panels).
+
+✨ Highlights
+
+· 🧬 Load primers manually or import directly from PDM
+· 🔍 IUPAC support – Handles degenerate bases (R, Y, S, W, K, M, B, D, H, V, N) and Inosine (I)
+· 🧮 Semi-global alignment – Detects binding with indels and 5′ tails
+· ⚠️ Multi-binding detection – Warns if a primer binds to multiple sites
+· 🚫 Both-strand rejection – Automatically rejects ambiguous primers
+· ✅ Validation – Amplicon length, Tm compatibility, dimer formation checks
+· 📊 Greedy optimization – Finds the optimal primer set for full coverage
+· 📈 Visual binding map – Graphical output (PNG) of primer binding sites
+· 📥 Downloadable JSON reports – Binding results, valid pairs, optimal panel
+· 📜 History tracking – Logs all runs with status and parameters
+
+📂 Location
+
+/sequencing_panel_optimizer/
+
+🚀 Quick Start
 
 ```bash
 cd sequencing_panel_optimizer
-install.bat
-```
-
-Or manually:
-
-```bash
 pip install -r requirements.txt
+python app.py
+# Open http://127.0.0.1:5000
 ```
-
-For Primer Database Manager:
-
-```bash
-cd ../primer_database_manager
-install.bat
-```
-
-Or manually:
-
-```bash
-pip install -r requirements.txt
-```
-
-💡 The install.bat script uses a Chinese mirror (Tsinghua) for faster downloads, especially within Iran/China. If you prefer the default PyPI, just run pip install -r requirements.txt.
-
-Step 3: Run the Applications
-
-Each tool runs on a different port to avoid conflicts.
-
-· SPO (Port 5000):
-  ```bash
-  cd sequencing_panel_optimizer
-  run.bat
-  ```
-  Access: http://127.0.0.1:5000
-· PDM (Port 5001):
-  ```bash
-  cd primer_database_manager
-  run.bat
-  ```
-  Access: http://127.0.0.1:5001
-
-Default Admin Login (PDM):
-
-· Username: admin
-· Password: admin123
 
 ---
 
-🔧 Manual Installation (for Linux/macOS)
+🔄 Workflow Integration
 
-If you are on Linux/macOS, simply use pip:
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     PRIMER TOOLS SUITE                       │
+├─────────────────────────┬───────────────────────────────────┤
+│   PRIMER DATABASE       │   SEQUENCING PANEL                │
+│   MANAGER (PDM)         │   OPTIMIZER (SPO)                 │
+├─────────────────────────┼───────────────────────────────────┤
+│  • Store primers/probes │  • Import primers from PDM        │
+│  • Design PCR programs  │  • Check binding specificity      │
+│  • Create multiplex     │  • Find optimal pairs             │
+│    panels               │  • Optimize coverage              │
+│  • Manage inventory     │  • Visualize binding sites        │
+│  • Backup & restore     │  • Export reports                 │
+└─────────────────────────┴───────────────────────────────────┘
+         │                           ▲
+         │      Import primers       │
+         └───────────────────────────┘
+```
+
+---
+
+📂 Repository Structure
+
+```
+primer-tools/
+├── README.md                           # ← You are here
+├── primer_database_manager/            # 🧬 PDM Application
+│   ├── app.py
+│   ├── database.py
+│   ├── auth.py
+│   ├── config.py
+│   ├── requirements.txt
+│   ├── install.bat
+│   ├── run.bat
+│   ├── templates/
+│   ├── static/
+│   └── backups/
+├── sequencing_panel_optimizer/         # 🧬 SPO Application
+│   ├── app.py
+│   ├── requirements.txt
+│   ├── install.bat
+│   ├── run.bat
+│   ├── templates/
+│   ├── scripts/
+│   └── results/
+└── LICENSE
+```
+
+---
+
+⚙️ Installation
+
+Prerequisites
+
+· Python 3.8 or higher
+· pip (Python package manager)
+
+Option 1: Windows (Recommended)
 
 ```bash
-# For SPO
-pip install flask pyyaml matplotlib tqdm
-python app.py
-
 # For PDM
+cd primer_database_manager
+install.bat
+run.bat
+
+# For SPO
+cd sequencing_panel_optimizer
+install.bat
+run.bat
+```
+
+💡 For users in Iran/China: The install.bat scripts use Tsinghua mirror for faster downloads.
+
+Option 2: Manual (All Platforms)
+
+```bash
+# For PDM
+cd primer_database_manager
 pip install flask werkzeug
 python app.py
+
+# For SPO
+cd sequencing_panel_optimizer
+pip install flask pyyaml matplotlib tqdm
+python app.py
 ```
-
----
-
-📸 Screenshots
-
-(Add screenshots of the Dashboard, Primer Detail, PCR Program Editor, and SPO Results here)
 
 ---
 
 🛠️ Technologies Used
 
-· Backend: Python, Flask
-· Database: SQLite (embedded)
-· Frontend: Bootstrap 5, Jinja2
-· Visualization: Matplotlib (for SPO charts), Chart.js (for PCR profiles)
-· Authentication: Werkzeug (password hashing)
+Technology PDM SPO Purpose
+Python ✅ ✅ Backend logic
+Flask ✅ ✅ Web framework
+SQLite ✅ ❌ Data storage
+Bootstrap 5 ✅ ✅ Responsive UI
+Chart.js ✅ ❌ PCR profile visualization
+Matplotlib ❌ ✅ Binding map generation
+Jinja2 ✅ ✅ Template rendering
+Werkzeug ✅ ❌ Password hashing
+
+---
+
+👤 Default Login
+
+Application URL Username Password
+PDM http://127.0.0.1:5001 admin admin123
+SPO http://127.0.0.1:5000 (no login required) —
+
+⚠️ Important: Change the default admin password immediately after first login.
+
+---
+
+👨‍💻 Developer
+
+Pourdad Panahi – Biotechnologist & Computational Biologist
+
+· 🧪 18+ years of molecular biology laboratory experience
+· 💻 Leveraging modern AI-assisted development to build scientific software
+· 🧬 Domain expertise in PCR, primer design, and sequencing workflows
+· 🎯 Seeking Bioinformatics / Computational Biology positions in Europe (Germany / Netherlands)
+
+https://img.shields.io/badge/GitHub-pourdadp-black?logo=github
+https://img.shields.io/badge/Portfolio-Website-blue
+
+---
+
+💡 From Wet Lab to Web App
+
+As a molecular biologist who understands exactly what the lab needs, I used DeepSeek AI to accelerate the development process — translating years of domain knowledge into functional tools in record time. The AI assisted with code generation while I provided:
+
+· Scientific requirements and validation
+· Algorithm design (semi-global alignment, greedy coverage optimization)
+· UI/UX decisions based on real lab workflows
+· Testing against authentic experimental scenarios
+
+The future belongs to scientists who can direct AI to build what they envision.
+
+Built in just 10 days with DeepSeek AI as a collaborative development partner.
 
 ---
 
 📄 License
 
-This project is open‑source and available under the MIT License.
+This project is open-source and available under the MIT License.
 
 ```
 MIT License
@@ -222,20 +262,28 @@ SOFTWARE.
 
 ---
 
-👨‍💻 Developer
+🙏 Acknowledgments
 
-Pourdad Panahi
-GitHub: https://github.com/pourdadp
-Project Page: https://github.com/pourdadp/pourdadp.github.io
+· Designed with molecular biologists and diagnostic labs in mind
+· Inspired by real-world needs for primer inventory management and sequencing panel optimization
+· Developed with the assistance of DeepSeek AI
+· Built by a scientist, for scientists
 
 ---
 
 📧 Contact & Support
 
-If you encounter any issues or have feature requests, please open an issue on GitHub or contact the developer directly.
+If you encounter any issues or have feature requests:
+
+· 📂 Open an issue on GitHub
+· 📧 Contact the developer direc
+
+--
+<p align="center">
+  <b>Made with 🧬 by a scientist who codes — powered by DeepSeek AI</b>
+</p>
+```
 
 ---
 
-🙏 Acknowledgments
-
-Designed with molecular biologists and diagnostic labs in mind. Inspired by real‑world needs for PCR optimization and primer inventory management.
+این فایل را به 
