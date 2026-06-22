@@ -24,7 +24,6 @@ app.secret_key = 'your-secret-key-change-this-in-production'
 # ==================== Helper Functions ====================
 
 def calculate_tm(sequence):
-    """Calculate Tm using Wallace formula (2*(A+T) + 4*(G+C))"""
     if not sequence:
         return None
     seq = sequence.upper()
@@ -130,7 +129,18 @@ def init_db():
         )
     ''')
 
-    # PCR steps table
+    # PCR cycle groups table (NEW)
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS pcr_cycle_groups (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            program_id INTEGER NOT NULL,
+            cycle_number INTEGER NOT NULL,
+            repeat_count INTEGER DEFAULT 1,
+            FOREIGN KEY (program_id) REFERENCES pcr_programs(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # PCR steps table (with cycle_group_id)
     c.execute('''
         CREATE TABLE IF NOT EXISTS pcr_steps (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -139,11 +149,10 @@ def init_db():
             step_type TEXT NOT NULL,
             temperature REAL,
             duration_sec INTEGER,
-            cycle_repeat INTEGER,
-            is_cycle_start BOOLEAN DEFAULT 0,
-            is_cycle_end BOOLEAN DEFAULT 0,
             is_read_step BOOLEAN DEFAULT 0,
-            FOREIGN KEY (program_id) REFERENCES pcr_programs(id) ON DELETE CASCADE
+            cycle_group_id INTEGER,
+            FOREIGN KEY (program_id) REFERENCES pcr_programs(id) ON DELETE CASCADE,
+            FOREIGN KEY (cycle_group_id) REFERENCES pcr_cycle_groups(id) ON DELETE SET NULL
         )
     ''')
 
@@ -229,7 +238,6 @@ def init_db():
         )
     ''')
 
-    # Create default admin user
     admin = c.execute("SELECT * FROM users WHERE username = 'admin'").fetchone()
     if not admin:
         admin_hash = generate_password_hash('admin123')
@@ -238,7 +246,6 @@ def init_db():
             ('admin', admin_hash, 'admin')
         )
 
-    # Trigger for updated_at
     c.execute('''
         CREATE TRIGGER IF NOT EXISTS update_primer_timestamp
         AFTER UPDATE ON primers
@@ -333,7 +340,6 @@ def add_alias_to_primer(primer_id, alias_name):
         return False, "This alias already exists for this primer."
 
 def check_duplicate_sequence(forward_seq, reverse_seq=None, exclude_id=None):
-    """Check if forward or reverse sequence already exists in database."""
     conn = get_db()
     query = "SELECT id, name, forward_sequence, reverse_sequence FROM primers WHERE is_active = 1"
     params = []
@@ -373,6 +379,24 @@ def get_pcr_program_by_id(program_id):
     program = conn.execute("SELECT * FROM pcr_programs WHERE id = ?", (program_id,)).fetchone()
     conn.close()
     return program
+
+def get_pcr_cycle_groups(program_id):
+    conn = get_db()
+    groups = conn.execute("SELECT * FROM pcr_cycle_groups WHERE program_id = ? ORDER BY cycle_number", (program_id,)).fetchall()
+    conn.close()
+    return groups
+
+def get_pcr_steps_with_groups(program_id):
+    conn = get_db()
+    steps = conn.execute('''
+        SELECT s.*, g.cycle_number, g.repeat_count
+        FROM pcr_steps s
+        LEFT JOIN pcr_cycle_groups g ON s.cycle_group_id = g.id
+        WHERE s.program_id = ?
+        ORDER BY s.step_order
+    ''', (program_id,)).fetchall()
+    conn.close()
+    return steps
 
 def get_pcr_steps(program_id):
     conn = get_db()
@@ -762,7 +786,6 @@ def primer_add():
             flash('Primer with this name already exists.', 'danger')
             return render_template('primer_add.html')
 
-        # --- Duplicate sequence check for both forward and reverse ---
         duplicate, existing_id, existing_name, direction = check_duplicate_sequence(
             data['forward_sequence'], data['reverse_sequence']
         )
@@ -782,7 +805,6 @@ def primer_add():
                 form_data=data
             )
 
-        # Calculate Tm if empty
         if not data['estimated_tm'] and data['forward_sequence']:
             data['estimated_tm'] = calculate_tm(data['forward_sequence'])
 
@@ -808,7 +830,6 @@ def primer_add():
         ))
         primer_id = c.lastrowid
 
-        # Custom fields
         custom_names = request.form.getlist('custom_field_name')
         custom_values = request.form.getlist('custom_field_value')
         for name, value in zip(custom_names, custom_values):
@@ -818,7 +839,6 @@ def primer_add():
                     (primer_id, name, value)
                 )
 
-        # If duplicate and user confirmed, add alias to existing primer
         if duplicate and request.form.get('confirm_duplicate') == 'yes':
             alias_name = request.form.get('alias_name')
             if alias_name and alias_name.strip():
@@ -852,7 +872,7 @@ def primer_detail(primer_id):
 
     programs_with_steps = []
     for prog in programs:
-        steps = get_pcr_steps(prog['id'])
+        steps = get_pcr_steps_with_groups(prog['id'])
         programs_with_steps.append({'program': prog, 'steps': steps})
 
     return render_template('primer_detail.html', primer=primer, custom_fields=custom_fields,
@@ -1018,40 +1038,60 @@ def pcr_program_edit(program_id):
             WHERE id = ?
         ''', (program_name, program_type, reaction_volume, master_mix, notes, program_id))
 
-        # Delete old steps
         conn.execute("DELETE FROM pcr_steps WHERE program_id = ?", (program_id,))
+        conn.execute("DELETE FROM pcr_cycle_groups WHERE program_id = ?", (program_id,))
 
-        # Get step data from form
+        # Get form data
         step_types = request.form.getlist('step_type[]')
         temperatures = request.form.getlist('temperature[]')
-        durations = request.form.getlist('duration_sec[]')
-        cycle_repeats = request.form.getlist('cycle_repeat[]')
+        duration_mins = request.form.getlist('duration_min[]')
+        duration_secs = request.form.getlist('duration_sec[]')
         is_reads = request.form.getlist('is_read_step[]')
+        cycle_group_ids = request.form.getlist('cycle_group[]')
+        cycle_repeats = request.form.getlist('cycle_repeat[]')
 
-        # Insert new steps
+        # Convert time to seconds
+        total_durations = []
+        for i in range(len(duration_mins)):
+            min_val = int(duration_mins[i]) if duration_mins[i] else 0
+            sec_val = int(duration_secs[i]) if duration_secs[i] else 0
+            total_durations.append(min_val * 60 + sec_val)
+
+        # Create cycle groups
+        cycle_groups_created = {}
+        for i, group_id in enumerate(cycle_group_ids):
+            if group_id and group_id not in cycle_groups_created:
+                repeat = int(cycle_repeats[i]) if cycle_repeats[i] else 1
+                c = conn.cursor()
+                c.execute('''
+                    INSERT INTO pcr_cycle_groups (program_id, cycle_number, repeat_count)
+                    VALUES (?, ?, ?)
+                ''', (program_id, int(group_id), repeat))
+                cycle_groups_created[group_id] = c.lastrowid
+
+        # Insert steps
         for i in range(len(step_types)):
             step_type = step_types[i].strip()
             if not step_type:
                 continue
 
-            temp = temperatures[i].strip() if i < len(temperatures) else ''
-            dur = durations[i].strip() if i < len(durations) else ''
-            cycle = cycle_repeats[i].strip() if i < len(cycle_repeats) else ''
-            is_read = 'on' in is_reads[i] if i < len(is_reads) else False
+            group_id = None
+            if cycle_group_ids[i]:
+                group_id = cycle_groups_created.get(cycle_group_ids[i])
 
             conn.execute('''
                 INSERT INTO pcr_steps (
                     program_id, step_order, step_type, temperature,
-                    duration_sec, cycle_repeat, is_read_step
+                    duration_sec, is_read_step, cycle_group_id
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', (
                 program_id,
                 i + 1,
                 step_type,
-                float(temp) if temp else None,
-                int(dur) if dur else None,
-                int(cycle) if cycle else None,
-                1 if is_read else 0
+                float(temperatures[i]) if temperatures[i] else None,
+                total_durations[i] if total_durations[i] else 0,
+                1 if is_reads and is_reads[i] == 'on' else 0,
+                group_id
             ))
 
         conn.commit()
@@ -1060,10 +1100,13 @@ def pcr_program_edit(program_id):
         flash('Program updated successfully.', 'success')
         return redirect(url_for('primer_detail', primer_id=primer_id))
 
-    steps = get_pcr_steps(program_id)
+    steps = get_pcr_steps_with_groups(program_id)
+    cycle_groups = get_pcr_cycle_groups(program_id)
+
     return render_template('pcr_program_edit.html',
                            program=program,
                            steps=steps,
+                           cycle_groups=cycle_groups,
                            primer_id=primer_id)
 
 @app.route('/programs/add', methods=['POST'])
