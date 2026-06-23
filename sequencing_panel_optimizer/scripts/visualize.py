@@ -13,50 +13,39 @@ def generate_binding_report(binding_results, seq_len, output_dir):
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Binding Results Report</title>
         <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background: #fff; }
-            h2 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
-            table { border-collapse: collapse; width: 100%; margin: 20px 0; font-size: 11pt; }
-            th, td { border: 1px solid #333; padding: 8px 10px; text-align: center; }
-            th { background-color: #2c3e50; color: white; font-weight: bold; }
-            tr:nth-child(even) { background-color: #f9f9f9; }
-            .accepted { background-color: #d4edda !important; }
-            .rejected { background-color: #f8d7da !important; }
-            .legend { margin: 15px 0; padding: 10px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 5px; }
-            .legend-item { display: inline-block; margin-right: 20px; }
-            .legend-color { display: inline-block; width: 20px; height: 20px; margin-right: 5px; vertical-align: middle; }
-            .legend-color.green { background-color: #d4edda; border: 1px solid #155724; }
-            .legend-color.red { background-color: #f8d7da; border: 1px solid #721c24; }
-            @media print {
-                body { margin: 10px; font-size: 9pt; }
-                th, td { padding: 4px 6px; }
-                .no-print { display: none !important; }
-                th { background-color: #2c3e50 !important; color: white !important; }
-                .accepted { background-color: #d4edda !important; }
-                .rejected { background-color: #f8d7da !important; }
-            }
-            .description {
-                font-size: 9pt;
-                color: #555;
-                text-align: left;
-                padding: 4px 8px;
-                background: #f1f1f1;
-                border-radius: 3px;
-            }
-            .field-desc {
-                display: inline-block;
-                margin: 2px 5px;
-                font-size: 8pt;
-                color: #666;
-            }
+            body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background: #fff; }}
+            h2 {{ color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }}
+            table {{ border-collapse: collapse; width: 100%; margin: 20px 0; font-size: 11pt; }}
+            th, td {{ border: 1px solid #333; padding: 8px 10px; text-align: center; }}
+            th {{ background-color: #2c3e50; color: white; font-weight: bold; }}
+            tr:nth-child(even) {{ background-color: #f9f9f9; }}
+            .accepted {{ background-color: #d4edda !important; }}
+            .rejected {{ background-color: #f8d7da !important; }}
+            .legend {{ margin: 15px 0; padding: 10px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 5px; }}
+            .legend-item {{ display: inline-block; margin-right: 20px; }}
+            .legend-color {{ display: inline-block; width: 20px; height: 20px; margin-right: 5px; vertical-align: middle; }}
+            .legend-color.green {{ background-color: #d4edda; border: 1px solid #155724; }}
+            .legend-color.red {{ background-color: #f8d7da; border: 1px solid #721c24; }}
+            .sequence {{ font-family: monospace; font-size: 9pt; word-break: break-all; }}
+            .description {{ font-size: 9pt; color: #555; text-align: left; padding: 4px 8px; background: #f1f1f1; border-radius: 3px; }}
+            .field-desc {{ display: inline-block; margin: 2px 5px; font-size: 8pt; color: #666; }}
+            @media print {{
+                body {{ margin: 10px; font-size: 9pt; }}
+                th, td {{ padding: 4px 6px; }}
+                .no-print {{ display: none !important; }}
+                th {{ background-color: #2c3e50 !important; color: white !important; }}
+                .accepted {{ background-color: #d4edda !important; }}
+                .rejected {{ background-color: #f8d7da !important; }}
+            }}
         </style>
     </head>
     <body>
         <button onclick="window.print()" class="no-print" style="padding:8px 16px; background:#2c3e50; color:white; border:none; border-radius:4px; cursor:pointer; float:right;">🖨️ Print</button>
         <h2>🧬 Primer Binding Results</h2>
-        <p><strong>Sequence Length:</strong> {seq_len} bp</p>
-        <p><strong>Total Primers:</strong> {total} &nbsp;|&nbsp;
-           <strong>Accepted:</strong> <span style="color:#155724;">{accepted}</span> &nbsp;|&nbsp;
-           <strong>Rejected:</strong> <span style="color:#721c24;">{rejected}</span></p>
+        <p><strong>Sequence Length:</strong> {} bp</p>
+        <p><strong>Total Primers:</strong> {} &nbsp;|&nbsp;
+           <strong>Accepted:</strong> <span style="color:#155724;">{}</span> &nbsp;|&nbsp;
+           <strong>Rejected:</strong> <span style="color:#721c24;">{}</span></p>
 
         <div class="legend">
             <span class="legend-item"><span class="legend-color green"></span> Accepted</span>
@@ -100,7 +89,7 @@ def generate_binding_report(binding_results, seq_len, output_dir):
                     <td>{mism}</td>
                     <td>{gaps}</td>
                     <td>{score}</td>
-                    <td class="sequence" style="font-family:monospace; font-size:9pt;">{seq}</td>
+                    <td class="sequence">{seq}</td>
                 </tr>
                     """
             else:
@@ -110,7 +99,7 @@ def generate_binding_report(binding_results, seq_len, output_dir):
                     <td>{status}</td>
                     <td>{direction}</td>
                     <td colspan="4">No binding positions</td>
-                    <td class="sequence" style="font-family:monospace; font-size:9pt;">{seq}</td>
+                    <td class="sequence">{seq}</td>
                 </tr>
                 """
         else:
@@ -120,11 +109,11 @@ def generate_binding_report(binding_results, seq_len, output_dir):
                     <td>{status}</td>
                     <td>-</td>
                     <td colspan="4" style="text-align:left; font-size:9pt; color:#721c24;">⚠️ {reason}</td>
-                    <td class="sequence" style="font-family:monospace; font-size:9pt;">{seq}</td>
+                    <td class="sequence">{seq}</td>
                 </tr>
             """
 
-    html_content += f"""
+    html_content += """
             </tbody>
         </table>
 
@@ -148,12 +137,12 @@ def generate_binding_report(binding_results, seq_len, output_dir):
     </html>
     """
 
-    html_content = html_content.format(
-        seq_len=seq_len,
-        total=len(binding_results),
-        accepted=sum(1 for v in binding_results.values() if v.get("status") == "ACCEPTED"),
-        rejected=sum(1 for v in binding_results.values() if v.get("status") == "REJECTED")
-    )
+    total = len(binding_results)
+    accepted = sum(1 for v in binding_results.values() if v.get("status") == "ACCEPTED")
+    rejected = total - accepted
+
+    # Format the HTML with the actual values (order: seq_len, total, accepted, rejected)
+    html_content = html_content.format(seq_len, total, accepted, rejected)
 
     report_path = os.path.join(output_dir, "binding_report.html")
     with open(report_path, "w", encoding="utf-8") as f:
