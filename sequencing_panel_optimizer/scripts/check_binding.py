@@ -1,7 +1,9 @@
 import json
 
 def reverse_complement(seq):
-    """Reverse complement with full IUPAC support, including inosine (I)."""
+    """Reverse complement with full IUPAC support (handles both cases)."""
+    # Convert to uppercase to handle lowercase input
+    seq = seq.upper()
     comp = {
         'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C',
         'R': 'Y', 'Y': 'R', 'S': 'S', 'W': 'W',
@@ -9,10 +11,13 @@ def reverse_complement(seq):
         'D': 'H', 'H': 'D', 'N': 'N',
         'I': 'I'  # Inosine pairs with any base, but reverse complement is itself
     }
-    return ''.join(comp[base] for base in reversed(seq))
+    # Use get() with default to avoid KeyError (fallback to base itself if not found)
+    return ''.join(comp.get(base, base) for base in reversed(seq))
 
 def are_bases_compatible(b1, b2):
     """Check if two bases (including IUPAC codes) are compatible."""
+    b1 = b1.upper()
+    b2 = b2.upper()
     iupac_map = {
         'A': {'A'}, 'C': {'C'}, 'G': {'G'}, 'T': {'T'},
         'R': {'A','G'}, 'Y': {'C','T'}, 'S': {'G','C'},
@@ -21,8 +26,8 @@ def are_bases_compatible(b1, b2):
         'V': {'A','C','G'}, 'N': {'A','C','G','T'},
         'I': {'A','C','G','T'}  # Inosine pairs with anything
     }
-    set1 = iupac_map.get(b1.upper(), {b1.upper()})
-    set2 = iupac_map.get(b2.upper(), {b2.upper()})
+    set1 = iupac_map.get(b1, {b1})
+    set2 = iupac_map.get(b2, {b2})
     return bool(set1 & set2)
 
 def semi_global_align(seq, primer, match_score=2, mismatch_penalty=-1, gap_penalty=-2):
