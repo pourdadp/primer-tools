@@ -4,40 +4,145 @@
 <h2>🔍 Advanced Search</h2>
 <p class="text-muted">Leave fields empty to ignore them.</p>
 <form method="POST" class="row g-3">
-    <div class="col-md-4"><input type="text" class="form-control" name="name" placeholder="Name"></div>
-    <div class="col-md-4"><input type="text" class="form-control" name="pair_name" placeholder="Pair Name"></div>
-    <div class="col-md-4"><input type="text" class="form-control" name="gene" placeholder="Gene"></div>
-    <div class="col-md-3"><input type="text" class="form-control" name="organism" placeholder="Organism"></div>
-    <div class="col-md-3"><input type="text" class="form-control" name="strain_or_serotype" placeholder="Strain/Serotype"></div>
-    <div class="col-md-3"><input type="text" class="form-control" name="pcr_type" placeholder="PCR Type"></div>
-    <div class="col-md-3"><input type="text" class="form-control" name="reference" placeholder="Reference"></div>
-    <div class="col-md-4"><input type="text" class="form-control" name="diagnostic_limitations" placeholder="Diagnostic Limitations"></div>
-    <div class="col-md-4"><input type="text" class="form-control" name="binding_region" placeholder="Binding Region"></div>
-    <div class="col-md-2"><input type="number" class="form-control" name="amplicon_length_min" placeholder="Min Length"></div>
-    <div class="col-md-2"><input type="number" class="form-control" name="amplicon_length_max" placeholder="Max Length"></div>
-    <div class="col-md-2"><input type="number" step="0.1" class="form-control" name="estimated_tm_min" placeholder="Min Tm"></div>
-    <div class="col-md-2"><input type="number" step="0.1" class="form-control" name="estimated_tm_max" placeholder="Max Tm"></div>
-    <div class="col-md-2"><div class="form-check"><input class="form-check-input" type="checkbox" name="for_sequencing"> For Sequencing</div></div>
-    <div class="col-md-2"><div class="form-check"><input class="form-check-input" type="checkbox" name="for_diagnosis"> For Diagnosis</div></div>
-    <div class="col-12"><button type="submit" class="btn btn-primary">Search</button></div>
+    <!-- ===== اطلاعات پایه ===== -->
+    <div class="col-md-4">
+        <label class="form-label">Name</label>
+        <input type="text" class="form-control" name="name" placeholder="Primer name">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Pair Name</label>
+        <input type="text" class="form-control" name="pair_name" placeholder="Pair name">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Gene</label>
+        <input type="text" class="form-control" name="gene" placeholder="Gene name">
+    </div>
+
+    <!-- ===== توالی‌ها (جدید) ===== -->
+    <div class="col-md-6">
+        <label class="form-label">Forward Sequence (partial match)</label>
+        <input type="text" class="form-control sequence" name="forward_sequence" placeholder="e.g., ATCG">
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">Reverse Sequence (partial match)</label>
+        <input type="text" class="form-control sequence" name="reverse_sequence" placeholder="e.g., CGAT">
+    </div>
+
+    <!-- ===== اطلاعات بیولوژیکی ===== -->
+    <div class="col-md-4">
+        <label class="form-label">Organism</label>
+        <input type="text" class="form-control" name="organism" placeholder="Organism">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Strain/Serotype</label>
+        <input type="text" class="form-control" name="strain_or_serotype" placeholder="Strain or serotype">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">PCR Type</label>
+        <input type="text" class="form-control" name="pcr_type" placeholder="e.g., qPCR, Conventional">
+    </div>
+
+    <!-- ===== مرجع و محدودیت‌ها ===== -->
+    <div class="col-md-6">
+        <label class="form-label">Reference</label>
+        <input type="text" class="form-control" name="reference" placeholder="Reference / Accession">
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">Diagnostic Limitations</label>
+        <input type="text" class="form-control" name="diagnostic_limitations" placeholder="Limitations">
+    </div>
+
+    <!-- ===== موقعیت اتصال ===== -->
+    <div class="col-md-6">
+        <label class="form-label">Binding Region</label>
+        <input type="text" class="form-control" name="binding_region" placeholder="Binding region">
+    </div>
+
+    <!-- ===== فیلدهای عددی ===== -->
+    <div class="col-md-3">
+        <label class="form-label">Amplicon Length (min)</label>
+        <input type="number" class="form-control" name="amplicon_length_min" placeholder="Min">
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Amplicon Length (max)</label>
+        <input type="number" class="form-control" name="amplicon_length_max" placeholder="Max">
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Estimated Tm (min)</label>
+        <input type="number" step="0.1" class="form-control" name="estimated_tm_min" placeholder="Min">
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Estimated Tm (max)</label>
+        <input type="number" step="0.1" class="form-control" name="estimated_tm_max" placeholder="Max">
+    </div>
+
+    <!-- ===== چک‌باکس‌ها ===== -->
+    <div class="col-12">
+        <div class="form-check form-check-inline">
+            <input class="form-check-input" type="checkbox" name="for_sequencing">
+            <label class="form-check-label">For Sequencing</label>
+        </div>
+        <div class="form-check form-check-inline">
+            <input class="form-check-input" type="checkbox" name="for_diagnosis">
+            <label class="form-check-label">For Diagnosis</label>
+        </div>
+    </div>
+
+    <!-- ===== دکمه جستجو ===== -->
+    <div class="col-12">
+        <button type="submit" class="btn btn-primary">🔍 Search</button>
+        <a href="{{ url_for('search') }}" class="btn btn-secondary">Clear</a>
+    </div>
 </form>
 
+<!-- ===== نمایش نتایج ===== -->
 {% if results %}
 <h4 class="mt-4">Results ({{ results|length }})</h4>
-<table class="table table-striped">
-    <thead><tr><th>Name</th><th>Pair</th><th>Gene</th><th>Organism</th><th>Length</th><th>Action</th></tr></thead>
-    <tbody>
-        {% for p in results %}
-        <tr>
-            <td>{{ p.name }}</td>
-            <td>{{ p.pair_name or '-' }}</td>
-            <td>{{ p.gene or '-' }}</td>
-            <td>{{ p.organism or '-' }}</td>
-            <td>{{ p.amplicon_length or '-' }}</td>
-            <td><a href="{{ url_for('primer_detail', primer_id=p.id) }}" class="btn btn-sm btn-info">View</a></td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div class="table-responsive">
+    <table class="table table-striped table-bordered">
+        <thead class="table-dark">
+            <tr>
+                <th>Name</th>
+                <th>Pair</th>
+                <th>Gene</th>
+                <th>Organism</th>
+                <th>Length</th>
+                <th>Forward Seq</th>
+                <th>Reverse Seq</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in results %}
+            <tr>
+                <td><strong>{{ p.name }}</strong></td>
+                <td>{{ p.pair_name or '-' }}</td>
+                <td>{{ p.gene or '-' }}</td>
+                <td>{{ p.organism or '-' }}</td>
+                <td>{{ p.amplicon_length or '-' }}</td>
+                <td class="sequence">{{ p.forward_sequence[:30] }}{% if p.forward_sequence|length > 30 %}...{% endif %}</td>
+                <td class="sequence">{{ p.reverse_sequence[:30] if p.reverse_sequence else '-' }}{% if p.reverse_sequence and p.reverse_sequence|length > 30 %}...{% endif %}</td>
+                <td><a href="{{ url_for('primer_detail', primer_id=p.id) }}" class="btn btn-sm btn-info">View</a></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8" class="text-muted text-center">No primers found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 {% endif %}
+
+<style>
+    .sequence {
+        font-family: 'Courier New', monospace;
+        font-size: 0.85rem;
+        word-break: break-all;
+        background-color: #f8f9fa;
+        padding: 2px 6px;
+        border-radius: 3px;
+    }
+    @media print {
+        .sequence { font-size: 7pt !important; }
+    }
+</style>
 {% endblock %}
