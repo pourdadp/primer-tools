@@ -129,7 +129,7 @@ def init_db():
         )
     ''')
 
-    # PCR cycle groups table (NEW)
+    # PCR cycle groups table
     c.execute('''
         CREATE TABLE IF NOT EXISTS pcr_cycle_groups (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1418,18 +1418,27 @@ def backup_restore(filename):
     flash('Database restored.', 'success')
     return redirect(url_for('backup_page'))
 
+# ==================== SEARCH (MODIFIED - with sequence search) ====================
+
 @app.route('/search', methods=['GET', 'POST'])
 @login_required
 def search():
     results = []
     if request.method == 'POST':
         filters = {}
-        for field in ['name', 'pair_name', 'gene', 'organism', 'strain_or_serotype',
-                      'pcr_type', 'reference', 'diagnostic_limitations', 'binding_region']:
+        # Text fields including sequences
+        text_fields = [
+            'name', 'pair_name', 'gene', 'organism', 'strain_or_serotype',
+            'pcr_type', 'reference', 'diagnostic_limitations', 'binding_region',
+            'forward_sequence',  # NEW
+            'reverse_sequence'   # NEW
+        ]
+        for field in text_fields:
             val = request.form.get(field)
             if val:
                 filters[field] = val
 
+        # Numeric ranges
         if request.form.get('amplicon_length_min'):
             filters['amplicon_length_min'] = int(request.form.get('amplicon_length_min'))
         if request.form.get('amplicon_length_max'):
@@ -1443,14 +1452,17 @@ def search():
         if request.form.get('for_diagnosis') == 'on':
             filters['for_diagnosis'] = 1
 
+        # Build query
         query = "SELECT * FROM primers WHERE is_active = 1"
         params = []
         for key, val in filters.items():
             if key.endswith('_min'):
-                query += f" AND {key[:-4]} >= ?"
+                field = key[:-4]
+                query += f" AND {field} >= ?"
                 params.append(val)
             elif key.endswith('_max'):
-                query += f" AND {key[:-4]} <= ?"
+                field = key[:-4]
+                query += f" AND {field} <= ?"
                 params.append(val)
             elif key in ['for_sequencing', 'for_diagnosis']:
                 query += f" AND {key} = ?"
@@ -1464,6 +1476,8 @@ def search():
         conn.close()
 
     return render_template('search.html', results=results)
+
+# ==================== API for SPO ====================
 
 @app.route('/api/primers/export')
 @login_required
