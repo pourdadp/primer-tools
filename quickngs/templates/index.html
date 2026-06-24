@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+
+{% block title %}QuickNGS - NGS Analysis{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-2 py-2">
+
+    <!-- Header Compact -->
+    <div class="text-center mb-3">
+        <h4 class="fw-bold">🧬 QuickNGS</h4>
+        <small class="text-muted">FASTQ → Report in one click</small>
+    </div>
+
+    <form method="POST" action="{{ url_for('start_analysis') }}" enctype="multipart/form-data" id="analysisForm">
+        
+        <!-- Card 1: Essential Inputs (Always visible) -->
+        <div class="card mb-2 shadow-sm border-0">
+            <div class="card-body py-2 px-3">
+                
+                <!-- Sample Name -->
+                <div class="mb-2">
+                    <label class="form-label small fw-bold mb-1">🧪 Sample Name *</label>
+                    <input type="text" class="form-control form-control-sm" 
+                           name="sample_name" placeholder="e.g., Patient_001" required>
+                </div>
+
+                <!-- R1 Upload -->
+                <div class="mb-2">
+                    <label class="form-label small fw-bold mb-1">📂 Forward Reads (R1) *</label>
+                    <div class="input-group input-group-sm">
+                        <input type="file" class="form-control" name="fastq_r1" 
+                               accept=".fastq,.fastq.gz,.fq,.fq.gz" required 
+                               id="r1_input">
+                        <button type="button" class="btn btn-outline-secondary" 
+                                onclick="document.getElementById('r1_input').click()">
+                            📁
+                        </button>
+                    </div>
+                    <small class="text-muted" id="r1_filename"></small>
+                </div>
+
+                <!-- R2 Upload -->
+                <div class="mb-2">
+                    <label class="form-label small fw-bold mb-1">📂 Reverse Reads (R2) *</label>
+                    <div class="input-group input-group-sm">
+                        <input type="file" class="form-control" name="fastq_r2" 
+                               accept=".fastq,.fastq.gz,.fq,.fq.gz" required
+                               id="r2_input">
+                        <button type="button" class="btn btn-outline-secondary"
+                                onclick="document.getElementById('r2_input').click()">
+                            📁
+                        </button>
+                    </div>
+                    <small class="text-muted" id="r2_filename"></small>
+                </div>
+
+                <!-- Reference Select -->
+                <div class="mb-2">
+                    <label class="form-label small fw-bold mb-1">🧬 Reference Genome</label>
+                    <select class="form-select form-select-sm" name="reference" id="reference_select">
+                        <option value="hg38">Human (hg38/GRCh38)</option>
+                        <option value="hg19">Human (hg19/GRCh37)</option>
+                        <option value="mm10">Mouse (mm10/GRCm38)</option>
+                        <option value="custom">Custom FASTA...</option>
+                    </select>
+                </div>
+
+                <!-- Custom Reference (Hidden by default) -->
+                <div class="mb-2" id="custom_ref_div" style="display:none;">
+                    <label class="form-label small mb-1">Upload Custom Reference (FASTA)</label>
+                    <input type="file" class="form-control form-control-sm" 
+                           name="custom_reference" accept=".fasta,.fa,.fna">
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Card 2: Quick Settings (Collapsible) -->
+        <div class="card mb-2 shadow-sm border-0">
+            <div class="card-header py-2 px-3 bg-light" data-bs-toggle="collapse" 
+                 data-bs-target="#settingsCollapse" role="button">
+                <small class="fw-bold">⚙️ Advanced Settings</small>
+                <small class="text-muted float-end">▼</small>
+            </div>
+            <div class="collapse" id="settingsCollapse">
+                <div class="card-body py-2 px-3">
+                    
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label small mb-1">Min Quality (Q)</label>
+                            <input type="number" class="form-control form-control-sm" 
+                                   name="min_quality" value="20" min="0" max="40">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small mb-1">Min Depth</label>
+                            <input type="number" class="form-control form-control-sm" 
+                                   name="min_depth" value="10" min="1">
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mt-1">
+                        <div class="col-6">
+                            <label class="form-label small mb-1">Variant Quality</label>
+                            <input type="number" class="form-control form-control-sm" 
+                                   name="min_variant_quality" value="30" min="0">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small mb-1">Max Mismatches</label>
+                            <input type="number" class="form-control form-control-sm" 
+                                   name="max_mismatches" value="2" min="0" max="10">
+                        </div>
+                    </div>
+
+                    <div class="form-check form-switch mt-2">
+                        <input class="form-check-input" type="checkbox" 
+                               name="trim_adapters" id="trim_adapters" checked>
+                        <label class="form-check-label small" for="trim_adapters">
+                            Trim Adapters
+                        </label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" 
+                               name="generate_plot" id="generate_plot" checked>
+                        <label class="form-check-label small" for="generate_plot">
+                            Generate Coverage Plot
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 3: Target Region (Optional, Collapsible) -->
+        <div class="card mb-2 shadow-sm border-0">
+            <div class="card-header py-2 px-3 bg-light" data-bs-toggle="collapse" 
+                 data-bs-target="#targetCollapse" role="button">
+                <small class="fw-bold">🎯 Target Region (Optional)</small>
+                <small class="text-muted float-end">▼</small>
+            </div>
+            <div class="collapse" id="targetCollapse">
+                <div class="card-body py-2 px-3">
+                    <div class="row g-2">
+                        <div class="col-4">
+                            <label class="form-label small mb-1">Chr</label>
+                            <input type="text" class="form-control form-control-sm" 
+                                   name="chromosome" placeholder="chr1">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label small mb-1">Start</label>
+                            <input type="number" class="form-control form-control-sm" 
+                                   name="region_start" min="1">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label small mb-1">End</label>
+                            <input type="number" class="form-control form-control-sm" 
+                                   name="region_end" min="1">
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <small class="text-muted">💡 Leave empty to analyze whole genome.</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </form>
+
+    <!-- Progress Section (Hidden initially) -->
+    <div id="progress_section" class="card mb-2 shadow-sm border-0" style="display:none;">
+        <div class="card-body py-2 px-3">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <small class="fw-bold">⏳ Analysis Progress</small>
+                <small id="progress_percent" class="text-primary fw-bold">0%</small>
+            </div>
+            <div class="progress" style="height: 20px;">
+                <div id="progress_bar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                     role="progressbar" style="width: 0%;">0%</div>
+            </div>
+            <small id="current_step" class="text-muted">Initializing pipeline...</small>
+            <div id="step_icons" class="mt-2 d-flex flex-wrap gap-1">
+                <span id="step_qc" class="badge bg-secondary">⏳ QC</span>
+                <span id="step_trim" class="badge bg-secondary">⏳ Trim</span>
+                <span id="step_align" class="badge bg-secondary">⏳ Align</span>
+                <span id="step_variants" class="badge bg-secondary">⏳ Variants</span>
+                <span id="step_annotate" class="badge bg-secondary">⏳ Annotate</span>
+                <span id="step_report" class="badge bg-secondary">⏳ Report</span>
+            </div>
+            <div class="mt-2 text-center" id="view_results_btn" style="display:none;">
+                <a href="#" class="btn btn-success btn-sm">✅ View Final Report</a>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- FAB Button -->
+<div class="position-fixed bottom-0 end-0 m-3" style="z-index: 1050;">
+    <button type="button" class="btn btn-primary btn-lg rounded-circle shadow-lg" 
+            onclick="document.getElementById('analysisForm').submit();"
+            style="width: 60px; height: 60px;" title="Start Analysis">
+        🚀
+    </button>
+</div>
+
+<!-- Menu Toggle Button (Top Right) -->
+<div class="position-fixed top-0 end-0 m-2" style="z-index: 1050;">
+    <button class="btn btn-light btn-sm rounded-circle shadow-sm" 
+            data-bs-toggle="offcanvas" data-bs-target="#quickMenu" title="Menu">
+        ☰
+    </button>
+</div>
+
+<!-- Offcanvas Menu -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="quickMenu">
+    <div class="offcanvas-header">
+        <h6 class="offcanvas-title">🧬 QuickNGS Menu</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body">
+        <div class="d-grid gap-2">
+            <a href="{{ url_for('index') }}" class="btn btn-outline-primary btn-sm">
+                🏠 New Analysis
+            </a>
+            <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="offcanvas">
+                📖 Documentation
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="offcanvas">
+                ℹ️ About
+            </button>
+        </div>
+        <hr>
+        <small class="text-muted">
+            QuickNGS v1.0<br>
+            Part of <strong>Primer Tools</strong> Suite<br>
+            Built with DeepSeek AI
+        </small>
+    </div>
+</div>
+
+<!-- JavaScript -->
+<script>
+// Show filename when file selected
+document.getElementById('r1_input').addEventListener('change', function() {
+    var fname = this.files[0] ? '✅ ' + this.files[0].name : '';
+    document.getElementById('r1_filename').textContent = fname;
+});
+
+document.getElementById('r2_input').addEventListener('change', function() {
+    var fname = this.files[0] ? '✅ ' + this.files[0].name : '';
+    document.getElementById('r2_filename').textContent = fname;
+});
+
+// Toggle custom reference upload
+document.getElementById('reference_select').addEventListener('change', function() {
+    document.getElementById('custom_ref_div').style.display = 
+        (this.value === 'custom') ? 'block' : 'none';
+});
+
+// Form submit: show progress section
+document.getElementById('analysisForm').addEventListener('submit', function(e) {
+    var r1 = document.getElementById('r1_input').files[0];
+    var r2 = document.getElementById('r2_input').files[0];
+    var sampleName = document.querySelector('input[name="sample_name"]').value.trim();
+    
+    if (!r1 || !r2) {
+        e.preventDefault();
+        alert('⚠️ Please select both R1 and R2 FASTQ files.');
+        return false;
+    }
+    if (!sampleName) {
+        e.preventDefault();
+        alert('⚠️ Please enter a sample name.');
+        return false;
+    }
+    
+    // Show progress section
+    document.getElementById('progress_section').style.display = 'block';
+    document.getElementById('progress_section').scrollIntoView({ behavior: 'smooth' });
+});
+</script>
+
+<style>
+/* Mobile optimizations */
+body {
+    background-color: #f8f9fa;
+}
+.card {
+    border-radius: 12px;
+}
+.form-control:focus, .form-select:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+}
+/* Make file inputs touch-friendly */
+input[type="file"] {
+    min-height: 38px;
+}
+/* FAB animation */
+.btn-lg.rounded-circle {
+    transition: transform 0.2s;
+}
+.btn-lg.rounded-circle:active {
+    transform: scale(0.9);
+}
+/* Collapse header cursor */
+.card-header[data-bs-toggle="collapse"] {
+    cursor: pointer;
+    user-select: none;
+}
+.card-header[data-bs-toggle="collapse"]:hover {
+    background-color: #e9ecef !important;
+}
+</style>
+{% endblock %}
