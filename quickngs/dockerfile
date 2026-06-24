@@ -1,0 +1,35 @@
+# Base image with Python 3.8 and Miniconda
+FROM continuumio/miniconda3:latest
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    wget \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install BWA and Samtools via conda
+RUN conda install -c bioconda bwa samtools -y
+
+# Install FreeBayes (via conda)
+RUN conda install -c bioconda freebayes -y
+
+# Install SnpEff (manual download)
+RUN wget -q https://snpeff.blob.core.windows.net/versions/snpEff_latest_core.zip && \
+    unzip snpEff_latest_core.zip -d /opt && \
+    rm snpEff_latest_core.zip
+
+# Set environment variables
+ENV PATH="/opt/snpEff:${PATH}"
+
+# Copy QuickNGS application
+WORKDIR /app
+COPY . /app
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Expose port
+EXPOSE 5002
+
+# Run the application
+CMD ["python", "app.py"]
