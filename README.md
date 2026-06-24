@@ -1,4 +1,4 @@
-markdown
+
 # 🧬 Primer Tools – Complete Molecular Biology Suite
 
 A comprehensive toolkit for molecular biology laboratories: primer management, PCR protocol design, targeted sequencing panel optimization, and NGS data analysis.
