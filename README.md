@@ -1,25 +1,27 @@
-```markdown
+markdown
 # 🧬 Primer Tools – Complete Molecular Biology Suite
 
-A comprehensive toolkit for molecular biology laboratories: primer management, PCR protocol design, and targeted sequencing panel optimization.
+A comprehensive toolkit for molecular biology laboratories: primer management, PCR protocol design, targeted sequencing panel optimization, and NGS data analysis.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/)
-[![Flask](https://img.shields.io/badge/Flask-3.0-lightgrey.svg)](https://flask.palletsprojects.com/)
+[![Flask](https://img.shields.io/badge/Flask-2.0-lightgrey.svg)](https://flask.palletsprojects.com/)
 [![Bootstrap](https://img.shields.io/badge/Bootstrap-5-purple.svg)](https://getbootstrap.com/)
+[![DeepSeek](https://img.shields.io/badge/Built_with-DeepSeek_AI-6C5CE7.svg)](https://deepseek.com)
 
 ---
 
 ## 📖 Overview
 
-**Primer Tools** is a suite of two integrated web applications designed by a molecular biologist with 18+ years of laboratory experience. These tools address real-world needs in diagnostic and research labs:
+**Primer Tools** is a suite of three integrated web applications designed by a molecular biologist with 18+ years of laboratory experience. These tools address real-world needs in diagnostic and research labs:
 
 | Tool | Purpose | Key Users |
 |------|---------|-----------|
 | 🧬 **Primer Database Manager (PDM)** | Centralized primer/probe inventory & PCR protocol design | Lab technicians, Researchers |
 | 🧬 **Sequencing Panel Optimizer (SPO)** | Optimize primer panels for full-length targeted sequencing | Bioinformaticians, NGS specialists |
+| 🧬 **QuickNGS** | One‑click NGS analysis pipeline (FASTQ → VCF → clinical report) | Researchers, Clinicians |
 
-Both tools work together seamlessly: **manage primers in PDM → optimize panels in SPO**.
+All three tools work together seamlessly: **manage primers in PDM → optimize panels in SPO → analyze NGS data with QuickNGS**.
 
 ---
 
@@ -88,25 +90,61 @@ python app.py
 
 ---
 
+🧬 QuickNGS
+
+What it does
+
+A mobile‑first web pipeline that takes raw FASTQ files and produces a variant report (VCF + annotated HTML) – no command line required.
+
+✨ Highlights
+
+· 📱 Mobile‑first interface – touch‑friendly, collapsible cards, FAB button
+· 📂 FASTQ upload – paired‑end reads with instant visual feedback
+· 🧬 Reference selection – built‑in human/mouse genomes or custom FASTA
+· ⚙️ Adjustable parameters – quality, depth, variant quality, adapter trimming
+· 🎯 Optional target region – analyze a specific genomic interval
+· ⏳ Live progress – step‑by‑step status with polling
+· 📊 Coverage plot – interactive (Plotly) coverage chart in the final report
+· 📥 Downloadable outputs – VCF, annotated variants, and report
+
+📂 Location
+
+/quickngs/
+
+🚀 Quick Start
+
+```bash
+cd quickngs
+pip install -r requirements.txt
+python app.py
+# Open http://127.0.0.1:5002
+```
+
+ℹ️ The current version includes a mock pipeline that simulates the NGS workflow. The full bioinformatics tools (BWA, FreeBayes, SnpEff) will be integrated via Docker in the next release.
+
+---
+
 🔄 Workflow Integration
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     PRIMER TOOLS SUITE                       │
-├─────────────────────────┬───────────────────────────────────┤
-│   PRIMER DATABASE       │   SEQUENCING PANEL                │
-│   MANAGER (PDM)         │   OPTIMIZER (SPO)                 │
-├─────────────────────────┼───────────────────────────────────┤
-│  • Store primers/probes │  • Import primers from PDM        │
-│  • Design PCR programs  │  • Check binding specificity      │
-│  • Create multiplex     │  • Find optimal pairs             │
-│    panels               │  • Optimize coverage              │
-│  • Manage inventory     │  • Visualize binding sites        │
-│  • Backup & restore     │  • Export reports                 │
-└─────────────────────────┴───────────────────────────────────┘
-         │                           ▲
-         │      Import primers       │
-         └───────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                       PRIMER TOOLS SUITE                          │
+├───────────────────┬───────────────────┬───────────────────────────┤
+│   PRIMER DATABASE │ SEQUENCING PANEL  │      QUICKNGS             │
+│   MANAGER (PDM)   │ OPTIMIZER (SPO)   │                            │
+├───────────────────┼───────────────────┼───────────────────────────┤
+│  • Store primers  │  • Import primers │  • Upload FASTQ            │
+│  • Design PCR     │    from PDM       │  • Select reference        │
+│  • Create panels  │  • Optimize       │  • Analyze NGS data        │
+│  • Manage stock   │    coverage       │  • Generate report         │
+│  • Backup/restore │  • Visualize      │  • Export VCF              │
+└───────────────────┴───────────────────┴───────────────────────────┘
+         │                    ▲                       ▲
+         │   Import primers   │                       │
+         └────────────────────┘                       │
+                   │                                  │
+                   └──────────────────────────────────┘
+                        Load designed panel to analyze its NGS data
 ```
 
 ---
@@ -116,6 +154,7 @@ python app.py
 ```
 primer-tools/
 ├── README.md                           # ← You are here
+├── LICENSE
 ├── primer_database_manager/            # 🧬 PDM Application
 │   ├── app.py
 │   ├── database.py
@@ -135,7 +174,17 @@ primer-tools/
 │   ├── templates/
 │   ├── scripts/
 │   └── results/
-└── LICENSE
+└── quickngs/                           # 🧬 QuickNGS Application
+    ├── app.py
+    ├── requirements.txt
+    ├── config.yaml
+    ├── .gitignore
+    ├── templates/
+    │   ├── base.html
+    │   ├── index.html
+    │   └── results.html
+    └── static/
+        └── style.css
 ```
 
 ---
@@ -159,21 +208,31 @@ run.bat
 cd sequencing_panel_optimizer
 install.bat
 run.bat
+
+# For QuickNGS
+cd quickngs
+pip install -r requirements.txt
+python app.py
 ```
 
-💡 For users in Iran/China: The install.bat scripts use Tsinghua mirror for faster downloads.
+💡 For users in Iran/China: The install.bat scripts for PDM and SPO use Tsinghua mirror for faster downloads. QuickNGS dependencies are lightweight and can be installed directly.
 
 Option 2: Manual (All Platforms)
 
 ```bash
-# For PDM
+# PDM
 cd primer_database_manager
 pip install flask werkzeug
 python app.py
 
-# For SPO
+# SPO
 cd sequencing_panel_optimizer
 pip install flask pyyaml matplotlib tqdm
+python app.py
+
+# QuickNGS
+cd quickngs
+pip install flask biopython pyyaml plotly
 python app.py
 ```
 
@@ -181,15 +240,18 @@ python app.py
 
 🛠️ Technologies Used
 
-Technology PDM SPO Purpose
-Python ✅ ✅ Backend logic
-Flask ✅ ✅ Web framework
-SQLite ✅ ❌ Data storage
-Bootstrap 5 ✅ ✅ Responsive UI
-Chart.js ✅ ❌ PCR profile visualization
-Matplotlib ❌ ✅ Binding map generation
-Jinja2 ✅ ✅ Template rendering
-Werkzeug ✅ ❌ Password hashing
+Technology PDM SPO QuickNGS Purpose
+Python ✅ ✅ ✅ Backend logic
+Flask ✅ ✅ ✅ Web framework
+SQLite ✅ ❌ ❌ Data storage
+Bootstrap 5 ✅ ✅ ✅ Responsive UI
+Chart.js ✅ ❌ ❌ PCR profile visualization
+Matplotlib ❌ ✅ ❌ Binding map generation
+Plotly ❌ ❌ ✅ Interactive coverage plots
+Biopython ❌ ❌ ✅ FASTA/FASTQ handling
+PyYAML ❌ ❌ ✅ Configuration files
+Jinja2 ✅ ✅ ✅ Template rendering
+Werkzeug ✅ ❌ ❌ Password hashing
 
 ---
 
@@ -198,8 +260,9 @@ Werkzeug ✅ ❌ Password hashing
 Application URL Username Password
 PDM http://127.0.0.1:5001 admin admin123
 SPO http://127.0.0.1:5000 (no login required) —
+QuickNGS http://127.0.0.1:5002 (no login required) —
 
-⚠️ Important: Change the default admin password immediately after first login.
+⚠️ Important: Change the default admin password in PDM immediately after first login.
 
 ---
 
@@ -265,7 +328,7 @@ SOFTWARE.
 🙏 Acknowledgments
 
 · Designed with molecular biologists and diagnostic labs in mind
-· Inspired by real-world needs for primer inventory management and sequencing panel optimization
+· Inspired by real-world needs for primer inventory management, sequencing panel optimization, and NGS analysis
 · Developed with the assistance of DeepSeek AI
 · Built by a scientist, for scientists
 
@@ -276,14 +339,10 @@ SOFTWARE.
 If you encounter any issues or have feature requests:
 
 · 📂 Open an issue on GitHub
-· 📧 Contact the developer direc
-
---
-<p align="center">
-  <b>Made with 🧬 by a scientist who codes — powered by DeepSeek AI</b>
-</p>
-```
+· 📧 Contact the developer directly
 
 ---
 
-این فایل را به 
+<p align="center">
+  <b>Made with 🧬 by a scientist who codes — powered by DeepSeek AI</b>
+</p>
