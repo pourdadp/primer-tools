@@ -3,197 +3,219 @@
 {% block title %}QuickNGS - NGS Analysis{% endblock %}
 
 {% block content %}
-<div class="container-fluid px-2 py-2">
+<!-- Desktop Container: مرکزچین با عرض محدود -->
+<div class="container-fluid px-2 py-2 px-md-4 py-md-4">
+    <div class="mx-auto" style="max-width: 800px;">
 
-    <!-- Header Compact -->
-    <div class="text-center mb-3">
-        <h4 class="fw-bold">🧬 QuickNGS</h4>
-        <small class="text-muted">FASTQ → Report in one click</small>
-    </div>
-
-    <form method="POST" action="{{ url_for('start_analysis') }}" enctype="multipart/form-data" id="analysisForm">
-        
-        <!-- Card 1: Essential Inputs (Always visible) -->
-        <div class="card mb-2 shadow-sm border-0">
-            <div class="card-body py-2 px-3">
-                
-                <!-- Sample Name -->
-                <div class="mb-2">
-                    <label class="form-label small fw-bold mb-1">🧪 Sample Name *</label>
-                    <input type="text" class="form-control form-control-sm" 
-                           name="sample_name" placeholder="e.g., Patient_001" required>
-                </div>
-
-                <!-- R1 Upload -->
-                <div class="mb-2">
-                    <label class="form-label small fw-bold mb-1">📂 Forward Reads (R1) *</label>
-                    <div class="input-group input-group-sm">
-                        <input type="file" class="form-control" name="fastq_r1" 
-                               accept=".fastq,.fastq.gz,.fq,.fq.gz" required 
-                               id="r1_input">
-                        <button type="button" class="btn btn-outline-secondary" 
-                                onclick="document.getElementById('r1_input').click()">
-                            📁
-                        </button>
-                    </div>
-                    <small class="text-muted" id="r1_filename"></small>
-                </div>
-
-                <!-- R2 Upload -->
-                <div class="mb-2">
-                    <label class="form-label small fw-bold mb-1">📂 Reverse Reads (R2) *</label>
-                    <div class="input-group input-group-sm">
-                        <input type="file" class="form-control" name="fastq_r2" 
-                               accept=".fastq,.fastq.gz,.fq,.fq.gz" required
-                               id="r2_input">
-                        <button type="button" class="btn btn-outline-secondary"
-                                onclick="document.getElementById('r2_input').click()">
-                            📁
-                        </button>
-                    </div>
-                    <small class="text-muted" id="r2_filename"></small>
-                </div>
-
-                <!-- Reference Select -->
-                <div class="mb-2">
-                    <label class="form-label small fw-bold mb-1">🧬 Reference Genome</label>
-                    <select class="form-select form-select-sm" name="reference" id="reference_select">
-                        <option value="hg38">Human (hg38/GRCh38)</option>
-                        <option value="hg19">Human (hg19/GRCh37)</option>
-                        <option value="mm10">Mouse (mm10/GRCm38)</option>
-                        <option value="custom">Custom FASTA...</option>
-                    </select>
-                </div>
-
-                <!-- Custom Reference (Hidden by default) -->
-                <div class="mb-2" id="custom_ref_div" style="display:none;">
-                    <label class="form-label small mb-1">Upload Custom Reference (FASTA)</label>
-                    <input type="file" class="form-control form-control-sm" 
-                           name="custom_reference" accept=".fasta,.fa,.fna">
-                </div>
-
-            </div>
+        <!-- Header -->
+        <div class="text-center mb-3 mb-md-4">
+            <h4 class="fw-bold d-md-none">🧬 QuickNGS</h4>
+            <h2 class="fw-bold d-none d-md-block">🧬 QuickNGS</h2>
+            <small class="text-muted">FASTQ → Report in one click</small>
         </div>
 
-        <!-- Card 2: Quick Settings (Collapsible) -->
-        <div class="card mb-2 shadow-sm border-0">
-            <div class="card-header py-2 px-3 bg-light" data-bs-toggle="collapse" 
-                 data-bs-target="#settingsCollapse" role="button">
-                <small class="fw-bold">⚙️ Advanced Settings</small>
-                <small class="text-muted float-end">▼</small>
-            </div>
-            <div class="collapse" id="settingsCollapse">
-                <div class="card-body py-2 px-3">
+        <form method="POST" action="{{ url_for('start_analysis') }}" enctype="multipart/form-data" id="analysisForm">
+            
+            <!-- Card 1: Essential Inputs (Always visible) -->
+            <div class="card mb-2 mb-md-3 shadow-sm border-0">
+                <div class="card-body py-2 px-3 py-md-3 px-md-4">
                     
-                    <div class="row g-2">
-                        <div class="col-6">
-                            <label class="form-label small mb-1">Min Quality (Q)</label>
-                            <input type="number" class="form-control form-control-sm" 
-                                   name="min_quality" value="20" min="0" max="40">
+                    <!-- Sample Name -->
+                    <div class="mb-2 mb-md-3">
+                        <label class="form-label small fw-bold mb-1 d-md-none">🧪 Sample Name *</label>
+                        <label class="form-label fw-bold mb-1 d-none d-md-block">🧪 Sample Name *</label>
+                        <input type="text" class="form-control form-control-sm form-control-md" 
+                               name="sample_name" placeholder="e.g., Patient_001" required>
+                    </div>
+
+                    <div class="row g-2 g-md-3">
+                        <!-- R1 Upload -->
+                        <div class="col-md-6 mb-2 mb-md-0">
+                            <label class="form-label small fw-bold mb-1 d-md-none">📂 Forward Reads (R1) *</label>
+                            <label class="form-label fw-bold mb-1 d-none d-md-block">📂 Forward Reads (R1) *</label>
+                            <div class="input-group input-group-sm input-group-md">
+                                <input type="file" class="form-control" name="fastq_r1" 
+                                       accept=".fastq,.fastq.gz,.fq,.fq.gz" required 
+                                       id="r1_input">
+                                <button type="button" class="btn btn-outline-secondary" 
+                                        onclick="document.getElementById('r1_input').click()">
+                                    📁
+                                </button>
+                            </div>
+                            <small class="text-muted" id="r1_filename"></small>
                         </div>
-                        <div class="col-6">
-                            <label class="form-label small mb-1">Min Depth</label>
-                            <input type="number" class="form-control form-control-sm" 
-                                   name="min_depth" value="10" min="1">
+
+                        <!-- R2 Upload -->
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold mb-1 d-md-none">📂 Reverse Reads (R2) *</label>
+                            <label class="form-label fw-bold mb-1 d-none d-md-block">📂 Reverse Reads (R2) *</label>
+                            <div class="input-group input-group-sm input-group-md">
+                                <input type="file" class="form-control" name="fastq_r2" 
+                                       accept=".fastq,.fastq.gz,.fq,.fq.gz" required
+                                       id="r2_input">
+                                <button type="button" class="btn btn-outline-secondary"
+                                        onclick="document.getElementById('r2_input').click()">
+                                    📁
+                                </button>
+                            </div>
+                            <small class="text-muted" id="r2_filename"></small>
                         </div>
                     </div>
 
-                    <div class="row g-2 mt-1">
-                        <div class="col-6">
-                            <label class="form-label small mb-1">Variant Quality</label>
-                            <input type="number" class="form-control form-control-sm" 
-                                   name="min_variant_quality" value="30" min="0">
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label small mb-1">Max Mismatches</label>
-                            <input type="number" class="form-control form-control-sm" 
-                                   name="max_mismatches" value="2" min="0" max="10">
-                        </div>
+                    <!-- Reference Select -->
+                    <div class="mt-2 mt-md-3">
+                        <label class="form-label small fw-bold mb-1 d-md-none">🧬 Reference Genome</label>
+                        <label class="form-label fw-bold mb-1 d-none d-md-block">🧬 Reference Genome</label>
+                        <select class="form-select form-select-sm form-select-md" name="reference" id="reference_select">
+                            <option value="hg38">Human (hg38/GRCh38)</option>
+                            <option value="hg19">Human (hg19/GRCh37)</option>
+                            <option value="mm10">Mouse (mm10/GRCm38)</option>
+                            <option value="custom">Custom FASTA...</option>
+                        </select>
                     </div>
 
-                    <div class="form-check form-switch mt-2">
-                        <input class="form-check-input" type="checkbox" 
-                               name="trim_adapters" id="trim_adapters" checked>
-                        <label class="form-check-label small" for="trim_adapters">
-                            Trim Adapters
-                        </label>
+                    <!-- Custom Reference (Hidden by default) -->
+                    <div class="mt-2" id="custom_ref_div" style="display:none;">
+                        <label class="form-label small mb-1">Upload Custom Reference (FASTA)</label>
+                        <input type="file" class="form-control form-control-sm" 
+                               name="custom_reference" accept=".fasta,.fa,.fna">
                     </div>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" 
-                               name="generate_plot" id="generate_plot" checked>
-                        <label class="form-check-label small" for="generate_plot">
-                            Generate Coverage Plot
-                        </label>
+
+                </div>
+            </div>
+
+            <!-- Card 2: Advanced Settings (Collapsible on mobile, open on desktop) -->
+            <div class="card mb-2 mb-md-3 shadow-sm border-0">
+                <div class="card-header py-2 px-3 py-md-2 px-md-4 bg-light d-md-none" 
+                     data-bs-toggle="collapse" data-bs-target="#settingsCollapse" role="button">
+                    <small class="fw-bold">⚙️ Advanced Settings</small>
+                    <small class="text-muted float-end">▼</small>
+                </div>
+                <div class="card-header py-2 px-3 py-md-2 px-md-4 bg-light d-none d-md-block">
+                    <small class="fw-bold">⚙️ Advanced Settings</small>
+                </div>
+                <div class="collapse show" id="settingsCollapse">
+                    <div class="card-body py-2 px-3 py-md-3 px-md-4">
+                        
+                        <div class="row g-2 g-md-3">
+                            <div class="col-6 col-md-3">
+                                <label class="form-label small mb-1">Min Quality (Q)</label>
+                                <input type="number" class="form-control form-control-sm" 
+                                       name="min_quality" value="20" min="0" max="40">
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label class="form-label small mb-1">Min Depth</label>
+                                <input type="number" class="form-control form-control-sm" 
+                                       name="min_depth" value="10" min="1">
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label class="form-label small mb-1">Variant Quality</label>
+                                <input type="number" class="form-control form-control-sm" 
+                                       name="min_variant_quality" value="30" min="0">
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label class="form-label small mb-1">Max Mismatches</label>
+                                <input type="number" class="form-control form-control-sm" 
+                                       name="max_mismatches" value="2" min="0" max="10">
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-3 mt-2 mt-md-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" 
+                                       name="trim_adapters" id="trim_adapters" checked>
+                                <label class="form-check-label small" for="trim_adapters">
+                                    Trim Adapters
+                                </label>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" 
+                                       name="generate_plot" id="generate_plot" checked>
+                                <label class="form-check-label small" for="generate_plot">
+                                    Coverage Plot
+                                </label>
+                            </div>
+                        </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Card 3: Target Region (Optional) -->
+            <div class="card mb-2 mb-md-3 shadow-sm border-0">
+                <div class="card-header py-2 px-3 py-md-2 px-md-4 bg-light d-md-none" 
+                     data-bs-toggle="collapse" data-bs-target="#targetCollapse" role="button">
+                    <small class="fw-bold">🎯 Target Region (Optional)</small>
+                    <small class="text-muted float-end">▼</small>
+                </div>
+                <div class="card-header py-2 px-3 py-md-2 px-md-4 bg-light d-none d-md-block">
+                    <small class="fw-bold">🎯 Target Region (Optional)</small>
+                </div>
+                <div class="collapse" id="targetCollapse">
+                    <div class="card-body py-2 px-3 py-md-3 px-md-4">
+                        <div class="row g-2 g-md-3">
+                            <div class="col-4">
+                                <label class="form-label small mb-1">Chr</label>
+                                <input type="text" class="form-control form-control-sm" 
+                                       name="chromosome" placeholder="chr1">
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label small mb-1">Start</label>
+                                <input type="number" class="form-control form-control-sm" 
+                                       name="region_start" min="1">
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label small mb-1">End</label>
+                                <input type="number" class="form-control form-control-sm" 
+                                       name="region_end" min="1">
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <small class="text-muted">💡 Leave empty to analyze whole genome.</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Desktop Submit Button (Hidden on mobile) -->
+            <div class="d-none d-md-block text-center mb-4">
+                <button type="submit" class="btn btn-primary btn-lg px-5 shadow">
+                    🚀 Start Analysis
+                </button>
+            </div>
+
+        </form>
+
+        <!-- Progress Section (Hidden initially) -->
+        <div id="progress_section" class="card mb-2 mb-md-3 shadow-sm border-0" style="display:none;">
+            <div class="card-body py-2 px-3 py-md-3 px-md-4">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <small class="fw-bold">⏳ Analysis Progress</small>
+                    <small id="progress_percent" class="text-primary fw-bold">0%</small>
+                </div>
+                <div class="progress" style="height: 20px;">
+                    <div id="progress_bar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                         role="progressbar" style="width: 0%;">0%</div>
+                </div>
+                <small id="current_step" class="text-muted">Initializing pipeline...</small>
+                <div id="step_icons" class="mt-2 d-flex flex-wrap gap-1">
+                    <span id="step_qc" class="badge bg-secondary">⏳ QC</span>
+                    <span id="step_trim" class="badge bg-secondary">⏳ Trim</span>
+                    <span id="step_align" class="badge bg-secondary">⏳ Align</span>
+                    <span id="step_variants" class="badge bg-secondary">⏳ Variants</span>
+                    <span id="step_annotate" class="badge bg-secondary">⏳ Annotate</span>
+                    <span id="step_report" class="badge bg-secondary">⏳ Report</span>
+                </div>
+                <div class="mt-2 text-center" id="view_results_btn" style="display:none;">
+                    <a href="#" class="btn btn-success btn-sm">✅ View Final Report</a>
                 </div>
             </div>
         </div>
 
-        <!-- Card 3: Target Region (Optional, Collapsible) -->
-        <div class="card mb-2 shadow-sm border-0">
-            <div class="card-header py-2 px-3 bg-light" data-bs-toggle="collapse" 
-                 data-bs-target="#targetCollapse" role="button">
-                <small class="fw-bold">🎯 Target Region (Optional)</small>
-                <small class="text-muted float-end">▼</small>
-            </div>
-            <div class="collapse" id="targetCollapse">
-                <div class="card-body py-2 px-3">
-                    <div class="row g-2">
-                        <div class="col-4">
-                            <label class="form-label small mb-1">Chr</label>
-                            <input type="text" class="form-control form-control-sm" 
-                                   name="chromosome" placeholder="chr1">
-                        </div>
-                        <div class="col-4">
-                            <label class="form-label small mb-1">Start</label>
-                            <input type="number" class="form-control form-control-sm" 
-                                   name="region_start" min="1">
-                        </div>
-                        <div class="col-4">
-                            <label class="form-label small mb-1">End</label>
-                            <input type="number" class="form-control form-control-sm" 
-                                   name="region_end" min="1">
-                        </div>
-                    </div>
-                    <div class="mt-2">
-                        <small class="text-muted">💡 Leave empty to analyze whole genome.</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-    </form>
-
-    <!-- Progress Section (Hidden initially) -->
-    <div id="progress_section" class="card mb-2 shadow-sm border-0" style="display:none;">
-        <div class="card-body py-2 px-3">
-            <div class="d-flex justify-content-between align-items-center mb-1">
-                <small class="fw-bold">⏳ Analysis Progress</small>
-                <small id="progress_percent" class="text-primary fw-bold">0%</small>
-            </div>
-            <div class="progress" style="height: 20px;">
-                <div id="progress_bar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
-                     role="progressbar" style="width: 0%;">0%</div>
-            </div>
-            <small id="current_step" class="text-muted">Initializing pipeline...</small>
-            <div id="step_icons" class="mt-2 d-flex flex-wrap gap-1">
-                <span id="step_qc" class="badge bg-secondary">⏳ QC</span>
-                <span id="step_trim" class="badge bg-secondary">⏳ Trim</span>
-                <span id="step_align" class="badge bg-secondary">⏳ Align</span>
-                <span id="step_variants" class="badge bg-secondary">⏳ Variants</span>
-                <span id="step_annotate" class="badge bg-secondary">⏳ Annotate</span>
-                <span id="step_report" class="badge bg-secondary">⏳ Report</span>
-            </div>
-            <div class="mt-2 text-center" id="view_results_btn" style="display:none;">
-                <a href="#" class="btn btn-success btn-sm">✅ View Final Report</a>
-            </div>
-        </div>
     </div>
-
 </div>
 
-<!-- FAB Button -->
-<div class="position-fixed bottom-0 end-0 m-3" style="z-index: 1050;">
+<!-- FAB Button (Only on Mobile) -->
+<div class="position-fixed bottom-0 end-0 m-3 d-md-none" style="z-index: 1050;">
     <button type="button" class="btn btn-primary btn-lg rounded-circle shadow-lg" 
             onclick="document.getElementById('analysisForm').submit();"
             style="width: 60px; height: 60px;" title="Start Analysis">
@@ -201,8 +223,8 @@
     </button>
 </div>
 
-<!-- Menu Toggle Button (Top Right) -->
-<div class="position-fixed top-0 end-0 m-2" style="z-index: 1050;">
+<!-- Menu Toggle Button (Top Right, Mobile only) -->
+<div class="position-fixed top-0 end-0 m-2 d-md-none" style="z-index: 1050;">
     <button class="btn btn-light btn-sm rounded-circle shadow-sm" 
             data-bs-toggle="offcanvas" data-bs-target="#quickMenu" title="Menu">
         ☰
@@ -220,9 +242,9 @@
             <a href="{{ url_for('index') }}" class="btn btn-outline-primary btn-sm">
                 🏠 New Analysis
             </a>
-            <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="offcanvas">
-                📖 Documentation
-            </button>
+            <a href="{{ url_for('history') }}" class="btn btn-outline-secondary btn-sm">
+                📜 Run History
+            </a>
             <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="offcanvas">
                 ℹ️ About
             </button>
@@ -308,6 +330,15 @@ input[type="file"] {
 }
 .card-header[data-bs-toggle="collapse"]:hover {
     background-color: #e9ecef !important;
+}
+/* Desktop refinements */
+@media (min-width: 768px) {
+    .card {
+        border-radius: 16px;
+    }
+    .card-header {
+        border-radius: 16px 16px 0 0 !important;
+    }
 }
 </style>
 {% endblock %}
