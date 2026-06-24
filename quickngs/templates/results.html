@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Analysis Started - QuickNGS{% endblock %}
+{% block content %}
+<div class="container py-4 text-center">
+    <h4>🚀 Analysis Started</h4>
+    <p>Run ID: <strong>{{ run_id }}</strong></p>
+    <div class="progress mb-3" style="height: 25px;">
+        <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%">0%</div>
+    </div>
+    <p id="stepText">Starting pipeline...</p>
+    <a href="/results/{{ run_id }}" class="btn btn-outline-primary btn-sm" id="viewResultsBtn" style="display:none;">View Final Results</a>
+</div>
+
+<script>
+const runId = "{{ run_id }}";
+const interval = setInterval(() => {
+    fetch('/status/' + runId)
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('progressBar').style.width = data.progress + '%';
+            document.getElementById('progressBar').textContent = data.progress + '%';
+            document.getElementById('stepText').textContent = data.step;
+            if (data.progress >= 100) {
+                clearInterval(interval);
+                document.getElementById('viewResultsBtn').style.display = 'inline-block';
+            }
+        });
+}, 1500);
+</script>
+{% endblock %}
