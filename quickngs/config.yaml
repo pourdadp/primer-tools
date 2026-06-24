@@ -1,0 +1,6 @@
+sample_name: Test_Sample
+reference: hg38
+min_quality: 20
+min_depth: 10
+trim_adapters: true
+generate_plot: true
