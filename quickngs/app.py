@@ -382,4 +382,106 @@ def assemble_guided():
     ref_file = request.files.get('ref_file')
     if not files or not ref_file:
         return jsonify({"status": "error", "message": "Both sequence and reference files required."}), 400
-    project
+    project_name = request.form.get('project_name', 'Guided_Project')
+    trim_quality = request.form.get('trim_quality') == 'on'
+    quality_threshold = int(request.form.get('quality_threshold', 20))
+    window_size = int(request.form.get('window_size', 5))
+    run_id = f"{project_name}_{int(time.time())}"
+    results_dir = os.path.join(RESULTS_FOLDER, run_id)
+    os.makedirs(results_dir, exist_ok=True)
+    ref_path = os.path.join(results_dir, secure_filename(ref_file.filename))
+    ref_file.save(ref_path)
+    filepaths = []
+    for file in files:
+        fpath = os.path.join(results_dir, secure_filename(file.filename))
+        file.save(fpath)
+        filepaths.append(fpath)
+    from assembly import assemble_reads_from_files
+    result = assemble_reads_from_files(
+        filepaths, ref_fasta=ref_path, results_folder=results_dir,
+        trim_low_quality=trim_quality,
+        quality_threshold=quality_threshold,
+        window_size=window_size
+    )
+    return render_template('assemble_result.html', result=result, filename=files[0].filename)
+
+# ---------- Standard Routes ----------
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/start_ngs', methods=['POST'])
+def start_ngs():
+    sample_name = request.form.get('project_name', 'NGS_Sample').strip()
+    r1 = request.files.get('fastq_r1')
+    r2 = request.files.get('fastq_r2')
+    if not r1 or not r2:
+        return jsonify({"status": "error", "message": "Both FASTQ files required."}), 400
+    run_id = f"{sample_name}_{int(time.time())}"
+    results_dir = os.path.join(RESULTS_FOLDER, run_id)
+    os.makedirs(results_dir, exist_ok=True)
+    r1.save(os.path.join(results_dir, secure_filename(r1.filename)))
+    r2.save(os.path.join(results_dir, secure_filename(r2.filename)))
+    config = {
+        'sample_name': sample_name,
+        'reference': request.form.get('reference', 'hg38'),
+        'min_quality': int(request.form.get('min_quality', 20)),
+        'min_depth': int(request.form.get('min_depth', 10)),
+        'trim_adapters': request.form.get('trim_adapters') == 'on',
+    }
+    config_path = os.path.join(results_dir, 'config.yaml')
+    with open(config_path, 'w') as f:
+        yaml.dump(config, f)
+    threading.Thread(target=run_pipeline, args=(config_path, results_dir)).start()
+    return jsonify({"status": "started", "run_id": run_id})
+
+@app.route('/status/<run_id>')
+def get_status(run_id):
+    status_file = os.path.join(RESULTS_FOLDER, run_id, 'status.json')
+    if os.path.exists(status_file):
+        with open(status_file) as f:
+            return jsonify(json.load(f))
+    return jsonify({"step": "Waiting...", "progress": 0, "message": "Initializing..."})
+
+@app.route('/results/<run_id>')
+def view_results(run_id):
+    report_file = os.path.join(RESULTS_FOLDER, run_id, 'report.json')
+    variants_file = os.path.join(RESULTS_FOLDER, run_id, 'variants.json')
+    report, variants = {}, []
+    if os.path.exists(report_file):
+        with open(report_file) as f:
+            report = json.load(f)
+    if os.path.exists(variants_file):
+        with open(variants_file) as f:
+            variants = json.load(f)
+    return render_template('results_final.html', run_id=run_id, report=report, variants=variants)
+
+@app.route('/history')
+def history():
+    runs = []
+    if os.path.exists(RESULTS_FOLDER):
+        for folder in os.listdir(RESULTS_FOLDER):
+            status_file = os.path.join(RESULTS_FOLDER, folder, 'status.json')
+            if os.path.exists(status_file):
+                with open(status_file) as f:
+                    status = json.load(f)
+                runs.append({'id': folder, 'step': status.get('step', 'Unknown'), 'progress': status.get('progress', 0)})
+    runs.sort(key=lambda x: x['id'], reverse=True)
+    return render_template('history.html', runs=runs)
+
+@app.route('/download/<run_id>/<filename>')
+def download_file(run_id, filename):
+    file_path = os.path.join(RESULTS_FOLDER, run_id, secure_filename(filename))
+    if os.path.exists(file_path):
+        return send_file(file_path, as_attachment=True)
+    return jsonify({"status": "error", "message": "File not found."}), 404
+
+# ---------- Run ----------
+if __name__ == '__main__':
+    print("=" * 50)
+    print("🧬 QuickNGS v2.0 – NGS + Assembly Suite")
+    print("Powered by Pourdad Panahi – Built with DeepSeek AI")
+    print(f"Uploads: {UPLOAD_FOLDER}")
+    print(f"Results: {RESULTS_FOLDER}")
+    print("=" * 50)
+    app.run(host='0.0.0.0', port=5002, debug=False)
