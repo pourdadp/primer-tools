@@ -2,7 +2,7 @@
 DNA Assembly Module for QuickNGS
 Algorithms: Greedy OLC, Semi‑Global Alignment, De Bruijn Graph
 Supports AB1, FASTA, seq formats via Biopython
-Handles multiple files, orientation control, and reference‑guided assembly.
+Handles multiple files, orientation control, quality trimming, and reference‑guided assembly.
 Powered by Pourdad Panahi – Built with DeepSeek AI
 """
 
@@ -10,17 +10,59 @@ from Bio import SeqIO
 from io import StringIO
 import os, subprocess, tempfile
 
+# ---------- Quality Trimming ----------
+def trim_by_quality(seq, qualities, threshold=20, window=5):
+    """
+    Trim low-quality ends from a sequence based on Phred scores.
+    Returns trimmed sequence and trimmed qualities list.
+    """
+    if not qualities or len(qualities) != len(seq):
+        return seq, qualities  # No quality data
+    
+    # Trim from start
+    start = 0
+    for i in range(0, len(qualities) - window + 1):
+        avg = sum(qualities[i:i+window]) / window
+        if avg >= threshold:
+            start = i
+            break
+    
+    # Trim from end
+    end = len(qualities)
+    for i in range(len(qualities) - window, -1, -1):
+        avg = sum(qualities[i:i+window]) / window
+        if avg >= threshold:
+            end = i + window
+            break
+    
+    return seq[start:end], qualities[start:end]
+
 # ---------- File parsing ----------
-def parse_uploaded_file(filepath):
+def parse_uploaded_file(filepath, trim_low_quality=False, quality_threshold=20, window_size=5):
+    """
+    Parse uploaded file and return list of sequences.
+    If AB1 file and trim_low_quality is True, quality trimming is applied.
+    """
     filename = os.path.basename(filepath).lower()
     sequences = []
     try:
         if filename.endswith('.ab1'):
             record = SeqIO.read(filepath, 'abi')
-            sequences.append(str(record.seq))
+            seq = str(record.seq)
+            quals = record.letter_annotations.get('phred_quality', None)
+            
+            if trim_low_quality and quals:
+                original_len = len(seq)
+                seq, quals = trim_by_quality(seq, quals, quality_threshold, window_size)
+                # Log trimming info (optional)
+                print(f"  [Quality Trim] {filename}: {original_len}bp → {len(seq)}bp (threshold Q{quality_threshold}, window {window_size})")
+            
+            sequences.append(seq)
+            
         elif filename.endswith(('.fasta', '.fa', '.fna')):
             for record in SeqIO.parse(filepath, 'fasta'):
                 sequences.append(str(record.seq))
+                
         else:  # plain text / seq
             with open(filepath, 'r') as f:
                 lines = f.read().strip().split('\n')
@@ -33,10 +75,11 @@ def parse_uploaded_file(filepath):
         raise ValueError(f"Could not read {filename}: {str(e)}")
     return sequences
 
-def parse_uploaded_files(filepaths):
+def parse_uploaded_files(filepaths, trim_low_quality=False, quality_threshold=20, window_size=5):
+    """Parse multiple files and return combined list of sequences."""
     all_reads = []
     for fp in filepaths:
-        all_reads.extend(parse_uploaded_file(fp))
+        all_reads.extend(parse_uploaded_file(fp, trim_low_quality, quality_threshold, window_size))
     return all_reads
 
 # ---------- Utilities ----------
@@ -70,8 +113,7 @@ def find_overlap(a, b, min_len, fuzzy_threshold=50, max_mismatch=3):
                 best = i
     return best
 
-def greedy_assemble(reads, min_overlap=3, fuzzy_threshold=50, max_mismatch=3,
-                    orientation='auto'):
+def greedy_assemble(reads, min_overlap=3, fuzzy_threshold=50, max_mismatch=3, orientation='auto'):
     if not reads:
         return {'contig': '', 'steps': [], 'placements': [], 'remaining': [], 'total': 0}
     sorted_reads = sorted(reads, key=lambda x: -len(x))
@@ -85,6 +127,7 @@ def greedy_assemble(reads, min_overlap=3, fuzzy_threshold=50, max_mismatch=3,
         extended = True
         while temp_reads and extended:
             contig = resolve_and_build(placements)
+            # Containment check
             best_action = None
             for i, read in enumerate(temp_reads):
                 if contig.find(read) != -1 or (orientation != 'forward' and contig.find(reverse_complement(read)) != -1):
@@ -94,6 +137,8 @@ def greedy_assemble(reads, min_overlap=3, fuzzy_threshold=50, max_mismatch=3,
                 temp_reads.pop(best_action['idx'])
                 steps.append({'seq': best_action['read'], 'type': 'contained'})
                 continue
+            
+            # Find best overlap
             best_overlap, best_idx, best_ori, best_side, best_seq = 0, -1, 'f', 'right', None
             for i, read in enumerate(temp_reads):
                 # Forward
@@ -103,7 +148,7 @@ def greedy_assemble(reads, min_overlap=3, fuzzy_threshold=50, max_mismatch=3,
                 ov = find_overlap(read, contig, min_overlap, fuzzy_threshold, max_mismatch)
                 if ov > best_overlap:
                     best_overlap, best_idx, best_ori, best_side, best_seq = ov, i, 'f', 'left', read
-                # Reverse (if orientation != 'forward')
+                # Reverse
                 if orientation != 'forward':
                     rc = reverse_complement(read)
                     ov = find_overlap(contig, rc, min_overlap, fuzzy_threshold, max_mismatch)
@@ -112,12 +157,16 @@ def greedy_assemble(reads, min_overlap=3, fuzzy_threshold=50, max_mismatch=3,
                     ov = find_overlap(rc, contig, min_overlap, fuzzy_threshold, max_mismatch)
                     if ov > best_overlap:
                         best_overlap, best_idx, best_ori, best_side, best_seq = ov, i, 'r', 'left', rc
+            
             if best_idx == -1:
                 extended = False
                 break
+            
             chosen_read = temp_reads.pop(best_idx)
             oriented_seq = best_seq if best_ori == 'f' else reverse_complement(chosen_read)
             steps.append({'seq': chosen_read, 'type': 'add', 'orientation': best_ori, 'side': best_side, 'overlap': best_overlap})
+            
+            # Track mismatches
             mismatch_set = set()
             if best_overlap >= fuzzy_threshold:
                 if best_side == 'right':
@@ -129,6 +178,7 @@ def greedy_assemble(reads, min_overlap=3, fuzzy_threshold=50, max_mismatch=3,
                     for j in range(best_overlap):
                         if oriented_seq[len(oriented_seq) - best_overlap + j] != contig[j]:
                             mismatch_set.add(j)
+            
             if best_side == 'right':
                 placements.append({'seq': chosen_read, 'start': len(contig) - best_overlap,
                                    'end': len(contig) - best_overlap + len(oriented_seq) - 1,
@@ -139,10 +189,12 @@ def greedy_assemble(reads, min_overlap=3, fuzzy_threshold=50, max_mismatch=3,
                     p['start'] += shift
                     p['end'] += shift
                 placements.append({'seq': chosen_read, 'start': 0, 'end': len(oriented_seq) - 1, 'mismatches': set()})
+        
         contig = resolve_and_build(placements)
         if len(contig) > len(best_contig):
             best_contig, best_steps, best_placements, best_remaining = contig, steps, placements, temp_reads[:]
             break
+    
     return {'contig': best_contig, 'steps': best_steps, 'placements': best_placements,
             'remaining': best_remaining, 'total': len(sorted_reads)}
 
@@ -178,6 +230,8 @@ def semi_global_align(seq1, seq2):
             score[i][j] = best
             if best > max_score:
                 max_score, max_i, max_j = best, i, j
+    
+    # Traceback
     i, j = max_i, max_j
     matches = contig_start = read_start = 0
     while i > 0 and j > 0 and score[i][j] > 0:
@@ -192,6 +246,7 @@ def semi_global_align(seq1, seq2):
         else:
             break
         contig_start, read_start = i, j
+    
     return {'score': max_score, 'matches': matches, 'contig_start': contig_start, 'contig_end': max_i,
             'read_start': read_start, 'read_end': max_j}
 
@@ -205,8 +260,9 @@ def merge_read_to_contig(contig, read, min_overlap, orientation='auto'):
         if aln_rc['matches'] > aln['matches']:
             best_aln = aln_rc
             best_orientation = 'reverse'
+    
     if best_aln['matches'] >= min_overlap:
-        read_seq = read if best_orientation == 'forward' else rc
+        read_seq = read if best_orientation == 'forward' else reverse_complement(read)
         left_overhang = read_seq[:best_aln['read_start']]
         right_overhang = read_seq[best_aln['read_end']:]
         left_contig = contig[:best_aln['contig_start']]
@@ -258,54 +314,69 @@ def debruijn_assemble(reads, k=3):
 
 # ---------- Reference‑Guided assembly ----------
 def guided_assemble_fastq(r1_fastq, r2_fastq, ref_fasta, results_folder):
-    sample = os.path.basename(r1_fastq).replace('_R1.fastq','')
+    sample = os.path.basename(r1_fastq).replace('_R1.fastq', '')
     sam_file = os.path.join(results_folder, f"{sample}.sam")
     bam_file = os.path.join(results_folder, f"{sample}.bam")
     sorted_bam = os.path.join(results_folder, f"{sample}.sorted.bam")
+    
     with open(sam_file, 'w') as out:
-        subprocess.run(['bwa','mem','-M','-R',f'@RG\\tID:{sample}\\tSM:{sample}', ref_fasta, r1_fastq, r2_fastq],
+        subprocess.run(['bwa', 'mem', '-M', '-R', f'@RG\\tID:{sample}\\tSM:{sample}', ref_fasta, r1_fastq, r2_fastq],
                        stdout=out, stderr=subprocess.PIPE, check=True)
-    with open(bam_file,'w') as out:
-        subprocess.run(['samtools','view','-bS',sam_file], stdout=out, check=True)
-    subprocess.run(['samtools','sort','-o',sorted_bam,bam_file], check=True)
-    subprocess.run(['samtools','index',sorted_bam], check=True)
+    with open(bam_file, 'w') as out:
+        subprocess.run(['samtools', 'view', '-bS', sam_file], stdout=out, check=True)
+    subprocess.run(['samtools', 'sort', '-o', sorted_bam, bam_file], check=True)
+    subprocess.run(['samtools', 'index', sorted_bam], check=True)
+    
     # Consensus
     consensus_file = os.path.join(results_folder, f"{sample}_consensus.fa")
-    with open(consensus_file,'w') as out:
-        p1 = subprocess.run(['samtools','mpileup','-uf',ref_fasta,sorted_bam], capture_output=True, check=True)
-        p2 = subprocess.run(['bcftools','call','-c'], input=p1.stdout, capture_output=True, check=True)
-        p3 = subprocess.run(['bcftools','consensus','-f',ref_fasta], input=p2.stdout, stdout=out, check=True)
+    with open(consensus_file, 'w') as out:
+        p1 = subprocess.run(['samtools', 'mpileup', '-uf', ref_fasta, sorted_bam], capture_output=True, check=True)
+        p2 = subprocess.run(['bcftools', 'call', '-c'], input=p1.stdout, capture_output=True, check=True)
+        p3 = subprocess.run(['bcftools', 'consensus', '-f', ref_fasta], input=p2.stdout, stdout=out, check=True)
+    
     with open(consensus_file) as f:
         contig = f.read().strip()
+    
     # Coverage
     avg_depth, cov_20x = 0, 0
     try:
-        depth_out = subprocess.run(['samtools','depth',sorted_bam], capture_output=True, text=True)
+        depth_out = subprocess.run(['samtools', 'depth', sorted_bam], capture_output=True, text=True)
         depths = [int(l.split()[2]) for l in depth_out.stdout.strip().split('\n') if l]
         if depths:
-            avg_depth = sum(depths)/len(depths)
-            cov_20x = sum(1 for d in depths if d>=20)/len(depths)*100
-    except: pass
+            avg_depth = sum(depths) / len(depths)
+            cov_20x = sum(1 for d in depths if d >= 20) / len(depths) * 100
+    except:
+        pass
+    
     return {
         'contig': contig, 'variants': [], 'avg_depth': avg_depth,
-        'coverage_20x': cov_20x, 'placements': [{'seq': contig, 'start':0, 'end':len(contig)-1, 'mismatches':set()}]
+        'coverage_20x': cov_20x,
+        'placements': [{'seq': contig, 'start': 0, 'end': len(contig)-1, 'mismatches': set()}]
     }
 
 # ---------- Master assembly function ----------
 def assemble_reads_from_files(filepaths, mode='greedy', min_overlap=3, max_mismatch=3, k=3,
-                              orientation='auto', ref_fasta=None, results_folder=None):
+                              orientation='auto', ref_fasta=None, results_folder=None,
+                              trim_low_quality=False, quality_threshold=20, window_size=5):
+    """
+    Main assembly function.
+    If ref_fasta provided → guided assembly.
+    Else → de novo with chosen algorithm.
+    """
     if ref_fasta:
-        reads = parse_uploaded_files(filepaths)
+        # Write all reads to a single FASTQ pair for guided assembly
+        reads = parse_uploaded_files(filepaths, trim_low_quality, quality_threshold, window_size)
         r1_path = os.path.join(results_folder, 'combined_R1.fastq')
         r2_path = os.path.join(results_folder, 'combined_R2.fastq')
-        with open(r1_path,'w') as f1, open(r2_path,'w') as f2:
+        with open(r1_path, 'w') as f1, open(r2_path, 'w') as f2:
             for i, seq in enumerate(reads):
                 qual = ''.join(chr(40+33) for _ in seq)
                 f1.write(f"@read{i}\n{seq}\n+\n{qual}\n")
                 f2.write(f"@read{i}_R2\n\n+\n\n")
         return guided_assemble_fastq(r1_path, r2_path, ref_fasta, results_folder)
-
-    reads = parse_uploaded_files(filepaths)
+    
+    # De novo assembly
+    reads = parse_uploaded_files(filepaths, trim_low_quality, quality_threshold, window_size)
     if mode == 'greedy':
         res = greedy_assemble(reads, min_overlap, 50, max_mismatch, orientation)
     elif mode == 'alignment':
@@ -317,4 +388,5 @@ def assemble_reads_from_files(filepaths, mode='greedy', min_overlap=3, max_misma
     else:
         res = {'error': 'Unknown mode'}
     res['reads_count'] = len(reads)
+    res['trimmed'] = trim_low_quality
     return res
