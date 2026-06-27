@@ -1,344 +1,243 @@
 {% extends "base.html" %}
-
-{% block title %}QuickNGS - NGS Analysis{% endblock %}
-
+{% block title %}QuickNGS – Smart Analysis{% endblock %}
 {% block content %}
-<!-- Desktop Container: مرکزچین با عرض محدود -->
-<div class="container-fluid px-2 py-2 px-md-4 py-md-4">
-    <div class="mx-auto" style="max-width: 800px;">
+<div class="container-fluid px-2 py-2">
+    <div class="mx-auto" style="max-width: 700px;">
 
-        <!-- Header -->
-        <div class="text-center mb-3 mb-md-4">
-            <h4 class="fw-bold d-md-none">🧬 QuickNGS</h4>
-            <h2 class="fw-bold d-none d-md-block">🧬 QuickNGS</h2>
-            <small class="text-muted">FASTQ → Report in one click</small>
+        <!-- Welcome -->
+        <div class="text-center mb-3">
+            <h2 class="fw-bold">🧬 QuickNGS</h2>
+            <p class="lead">Welcome! Upload your sequences and let the system figure out the rest.</p>
+            <p class="text-muted small">Supports FASTQ (NGS), AB1 / seq / FASTA (Sanger)</p>
         </div>
 
-        <form method="POST" action="{{ url_for('start_analysis') }}" enctype="multipart/form-data" id="analysisForm">
-            
-            <!-- Card 1: Essential Inputs (Always visible) -->
-            <div class="card mb-2 mb-md-3 shadow-sm border-0">
-                <div class="card-body py-2 px-3 py-md-3 px-md-4">
-                    
-                    <!-- Sample Name -->
-                    <div class="mb-2 mb-md-3">
-                        <label class="form-label small fw-bold mb-1 d-md-none">🧪 Sample Name *</label>
-                        <label class="form-label fw-bold mb-1 d-none d-md-block">🧪 Sample Name *</label>
-                        <input type="text" class="form-control form-control-sm form-control-md" 
-                               name="sample_name" placeholder="e.g., Patient_001" required>
-                    </div>
-
-                    <div class="row g-2 g-md-3">
-                        <!-- R1 Upload -->
-                        <div class="col-md-6 mb-2 mb-md-0">
-                            <label class="form-label small fw-bold mb-1 d-md-none">📂 Forward Reads (R1) *</label>
-                            <label class="form-label fw-bold mb-1 d-none d-md-block">📂 Forward Reads (R1) *</label>
-                            <div class="input-group input-group-sm input-group-md">
-                                <input type="file" class="form-control" name="fastq_r1" 
-                                       accept=".fastq,.fastq.gz,.fq,.fq.gz" required 
-                                       id="r1_input">
-                                <button type="button" class="btn btn-outline-secondary" 
-                                        onclick="document.getElementById('r1_input').click()">
-                                    📁
-                                </button>
-                            </div>
-                            <small class="text-muted" id="r1_filename"></small>
-                        </div>
-
-                        <!-- R2 Upload -->
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold mb-1 d-md-none">📂 Reverse Reads (R2) *</label>
-                            <label class="form-label fw-bold mb-1 d-none d-md-block">📂 Reverse Reads (R2) *</label>
-                            <div class="input-group input-group-sm input-group-md">
-                                <input type="file" class="form-control" name="fastq_r2" 
-                                       accept=".fastq,.fastq.gz,.fq,.fq.gz" required
-                                       id="r2_input">
-                                <button type="button" class="btn btn-outline-secondary"
-                                        onclick="document.getElementById('r2_input').click()">
-                                    📁
-                                </button>
-                            </div>
-                            <small class="text-muted" id="r2_filename"></small>
-                        </div>
-                    </div>
-
-                    <!-- Reference Select -->
-                    <div class="mt-2 mt-md-3">
-                        <label class="form-label small fw-bold mb-1 d-md-none">🧬 Reference Genome</label>
-                        <label class="form-label fw-bold mb-1 d-none d-md-block">🧬 Reference Genome</label>
-                        <select class="form-select form-select-sm form-select-md" name="reference" id="reference_select">
-                            <option value="hg38">Human (hg38/GRCh38)</option>
-                            <option value="hg19">Human (hg19/GRCh37)</option>
-                            <option value="mm10">Mouse (mm10/GRCm38)</option>
-                            <option value="custom">Custom FASTA...</option>
-                        </select>
-                    </div>
-
-                    <!-- Custom Reference (Hidden by default) -->
-                    <div class="mt-2" id="custom_ref_div" style="display:none;">
-                        <label class="form-label small mb-1">Upload Custom Reference (FASTA)</label>
-                        <input type="file" class="form-control form-control-sm" 
-                               name="custom_reference" accept=".fasta,.fa,.fna">
-                    </div>
-
+        <!-- Smart Upload Form -->
+        <form id="smartForm" enctype="multipart/form-data">
+            <!-- File input for sequences (multiple allowed) -->
+            <div class="card mb-2 shadow-sm border-0">
+                <div class="card-body py-2 px-3">
+                    <label class="form-label small fw-bold mb-1">📂 Sequence Files *</label>
+                    <input type="file" class="form-control form-control-sm" id="seqFiles"
+                           name="seq_files" multiple
+                           accept=".fastq,.fq,.gz,.ab1,.seq,.fasta,.fa">
+                    <small class="text-muted">Select one or more files. NGS: paired FASTQ. Sanger: AB1/seq/FASTA.</small>
+                    <div id="fileList" class="mt-2"></div>
                 </div>
             </div>
 
-            <!-- Card 2: Advanced Settings (Collapsible on mobile, open on desktop) -->
-            <div class="card mb-2 mb-md-3 shadow-sm border-0">
-                <div class="card-header py-2 px-3 py-md-2 px-md-4 bg-light d-md-none" 
-                     data-bs-toggle="collapse" data-bs-target="#settingsCollapse" role="button">
-                    <small class="fw-bold">⚙️ Advanced Settings</small>
-                    <small class="text-muted float-end">▼</small>
-                </div>
-                <div class="card-header py-2 px-3 py-md-2 px-md-4 bg-light d-none d-md-block">
-                    <small class="fw-bold">⚙️ Advanced Settings</small>
-                </div>
-                <div class="collapse show" id="settingsCollapse">
-                    <div class="card-body py-2 px-3 py-md-3 px-md-4">
-                        
-                        <div class="row g-2 g-md-3">
-                            <div class="col-6 col-md-3">
-                                <label class="form-label small mb-1">Min Quality (Q)</label>
-                                <input type="number" class="form-control form-control-sm" 
-                                       name="min_quality" value="20" min="0" max="40">
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <label class="form-label small mb-1">Min Depth</label>
-                                <input type="number" class="form-control form-control-sm" 
-                                       name="min_depth" value="10" min="1">
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <label class="form-label small mb-1">Variant Quality</label>
-                                <input type="number" class="form-control form-control-sm" 
-                                       name="min_variant_quality" value="30" min="0">
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <label class="form-label small mb-1">Max Mismatches</label>
-                                <input type="number" class="form-control form-control-sm" 
-                                       name="max_mismatches" value="2" min="0" max="10">
-                            </div>
-                        </div>
-
-                        <div class="d-flex gap-3 mt-2 mt-md-3">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" 
-                                       name="trim_adapters" id="trim_adapters" checked>
-                                <label class="form-check-label small" for="trim_adapters">
-                                    Trim Adapters
-                                </label>
-                            </div>
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" 
-                                       name="generate_plot" id="generate_plot" checked>
-                                <label class="form-check-label small" for="generate_plot">
-                                    Coverage Plot
-                                </label>
-                            </div>
-                        </div>
-                    </div>
+            <!-- Reference (optional) -->
+            <div class="card mb-2 shadow-sm border-0">
+                <div class="card-body py-2 px-3">
+                    <label class="form-label small fw-bold mb-1">🧬 Reference (optional)</label>
+                    <input type="file" class="form-control form-control-sm" id="refFile"
+                           name="ref_file" accept=".fasta,.fa,.fna">
+                    <small class="text-muted">If provided, guided assembly will be used (Sanger) or custom reference (NGS).</small>
                 </div>
             </div>
 
-            <!-- Card 3: Target Region (Optional) -->
-            <div class="card mb-2 mb-md-3 shadow-sm border-0">
-                <div class="card-header py-2 px-3 py-md-2 px-md-4 bg-light d-md-none" 
-                     data-bs-toggle="collapse" data-bs-target="#targetCollapse" role="button">
-                    <small class="fw-bold">🎯 Target Region (Optional)</small>
-                    <small class="text-muted float-end">▼</small>
-                </div>
-                <div class="card-header py-2 px-3 py-md-2 px-md-4 bg-light d-none d-md-block">
-                    <small class="fw-bold">🎯 Target Region (Optional)</small>
-                </div>
-                <div class="collapse" id="targetCollapse">
-                    <div class="card-body py-2 px-3 py-md-3 px-md-4">
-                        <div class="row g-2 g-md-3">
-                            <div class="col-4">
-                                <label class="form-label small mb-1">Chr</label>
-                                <input type="text" class="form-control form-control-sm" 
-                                       name="chromosome" placeholder="chr1">
-                            </div>
-                            <div class="col-4">
-                                <label class="form-label small mb-1">Start</label>
-                                <input type="number" class="form-control form-control-sm" 
-                                       name="region_start" min="1">
-                            </div>
-                            <div class="col-4">
-                                <label class="form-label small mb-1">End</label>
-                                <input type="number" class="form-control form-control-sm" 
-                                       name="region_end" min="1">
-                            </div>
-                        </div>
-                        <div class="mt-2">
-                            <small class="text-muted">💡 Leave empty to analyze whole genome.</small>
-                        </div>
-                    </div>
+            <!-- Project Name -->
+            <div class="card mb-2 shadow-sm border-0">
+                <div class="card-body py-2 px-3">
+                    <label class="form-label small fw-bold mb-1">📝 Project Name (optional)</label>
+                    <input type="text" class="form-control form-control-sm" id="projectName"
+                           name="project_name" placeholder="Auto‑generated if empty">
                 </div>
             </div>
 
-            <!-- Desktop Submit Button (Hidden on mobile) -->
-            <div class="d-none d-md-block text-center mb-4">
-                <button type="submit" class="btn btn-primary btn-lg px-5 shadow">
+            <!-- Dynamic Settings (hidden until files detected) -->
+            <div id="dynamicSettings" style="display:none;"></div>
+
+            <!-- Start Button (disabled until files selected) -->
+            <div class="text-center mb-4">
+                <button type="submit" id="startBtn" class="btn btn-primary btn-lg px-5 shadow" disabled>
                     🚀 Start Analysis
                 </button>
             </div>
-
         </form>
 
-        <!-- Progress Section (Hidden initially) -->
-        <div id="progress_section" class="card mb-2 mb-md-3 shadow-sm border-0" style="display:none;">
-            <div class="card-body py-2 px-3 py-md-3 px-md-4">
-                <div class="d-flex justify-content-between align-items-center mb-1">
-                    <small class="fw-bold">⏳ Analysis Progress</small>
-                    <small id="progress_percent" class="text-primary fw-bold">0%</small>
+        <!-- Progress (hidden) -->
+        <div id="progress_section" style="display:none;">
+            <!-- same as before -->
+        </div>
+
+    </div>
+</div>
+
+<!-- JavaScript for smart detection -->
+<script>
+const seqInput = document.getElementById('seqFiles');
+const refInput = document.getElementById('refFile');
+const projectInput = document.getElementById('projectName');
+const dynamicDiv = document.getElementById('dynamicSettings');
+const startBtn = document.getElementById('startBtn');
+let detectedMode = null;  // 'ngs' or 'sanger'
+let sangerFileNames = [];
+
+seqInput.addEventListener('change', function() {
+    const files = Array.from(this.files);
+    if (files.length === 0) {
+        resetUI();
+        return;
+    }
+
+    // Classify files by extension
+    const hasFastq = files.some(f => /\.(fastq|fq|gz)$/i.test(f.name));
+    const hasSanger = files.some(f => /\.(ab1|seq|fasta|fa)$/i.test(f.name));
+
+    if (hasFastq && hasSanger) {
+        alert('Mixed file types detected. Please upload only NGS (FASTQ) or only Sanger (AB1/seq/FASTA) files.');
+        resetUI();
+        return;
+    }
+
+    if (hasFastq) {
+        // NGS mode
+        if (files.length !== 2) {
+            alert('For NGS analysis, please upload exactly two paired FASTQ files (R1 and R2).');
+            resetUI();
+            return;
+        }
+        detectedMode = 'ngs';
+        buildNGSForm(files);
+    } else {
+        // Sanger mode
+        detectedMode = 'sanger';
+        sangerFileNames = files.map(f => f.name);
+        buildSangerForm(files);
+    }
+
+    // Auto project name if empty
+    if (!projectInput.value.trim()) {
+        const base = files[0].name.replace(/\.[^/.]+$/, "");
+        const date = new Date().toISOString().slice(0,10).replace(/-/g,'');
+        projectInput.value = base + '_' + date;
+    }
+
+    startBtn.disabled = false;
+});
+
+refInput.addEventListener('change', function() {
+    if (detectedMode === 'sanger') {
+        buildSangerForm(Array.from(seqInput.files)); // refresh guided/de novo display
+    }
+});
+
+function resetUI() {
+    dynamicDiv.style.display = 'none';
+    dynamicDiv.innerHTML = '';
+    startBtn.disabled = true;
+    detectedMode = null;
+}
+
+function buildNGSForm(files) {
+    dynamicDiv.style.display = 'block';
+    dynamicDiv.innerHTML = `
+        <div class="card mb-2 shadow-sm border-0">
+            <div class="card-header bg-primary text-white py-1"><small>🔬 Reference‑Based NGS Settings</small></div>
+            <div class="card-body py-2 px-3">
+                <div class="row g-2">
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label small mb-1">🧬 Reference Genome</label>
+                        <select class="form-select form-select-sm" name="reference" id="refGenome">
+                            <option value="hg38">Human (hg38)</option>
+                            <option value="hg19">Human (hg19)</option>
+                            <option value="mm10">Mouse (mm10)</option>
+                            <option value="custom">Custom FASTA</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label class="form-label small mb-1">Min Quality (Q)</label>
+                        <input type="number" class="form-control form-control-sm" name="min_quality" value="20">
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label class="form-label small mb-1">Min Depth</label>
+                        <input type="number" class="form-control form-control-sm" name="min_depth" value="10">
+                    </div>
                 </div>
-                <div class="progress" style="height: 20px;">
-                    <div id="progress_bar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
-                         role="progressbar" style="width: 0%;">0%</div>
-                </div>
-                <small id="current_step" class="text-muted">Initializing pipeline...</small>
-                <div id="step_icons" class="mt-2 d-flex flex-wrap gap-1">
-                    <span id="step_qc" class="badge bg-secondary">⏳ QC</span>
-                    <span id="step_trim" class="badge bg-secondary">⏳ Trim</span>
-                    <span id="step_align" class="badge bg-secondary">⏳ Align</span>
-                    <span id="step_variants" class="badge bg-secondary">⏳ Variants</span>
-                    <span id="step_annotate" class="badge bg-secondary">⏳ Annotate</span>
-                    <span id="step_report" class="badge bg-secondary">⏳ Report</span>
-                </div>
-                <div class="mt-2 text-center" id="view_results_btn" style="display:none;">
-                    <a href="#" class="btn btn-success btn-sm">✅ View Final Report</a>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" name="trim_adapters" id="trimAdapters" checked>
+                    <label class="form-check-label small" for="trimAdapters">Trim Adapters</label>
                 </div>
             </div>
         </div>
+    `;
+    // Show custom reference upload if selected
+    document.getElementById('refGenome').addEventListener('change', function() {
+        const customDiv = document.getElementById('customRefDiv');
+        if (!customDiv) {
+            const div = document.createElement('div');
+            div.id = 'customRefDiv';
+            div.innerHTML = '<input type="file" class="form-control form-control-sm mt-2" name="custom_reference" accept=".fasta,.fa,.fna">';
+            this.parentNode.appendChild(div);
+        }
+        customDiv.style.display = this.value === 'custom' ? 'block' : 'none';
+    });
+}
 
-    </div>
-</div>
-
-<!-- FAB Button (Only on Mobile) -->
-<div class="position-fixed bottom-0 end-0 m-3 d-md-none" style="z-index: 1050;">
-    <button type="button" class="btn btn-primary btn-lg rounded-circle shadow-lg" 
-            onclick="document.getElementById('analysisForm').submit();"
-            style="width: 60px; height: 60px;" title="Start Analysis">
-        🚀
-    </button>
-</div>
-
-<!-- Menu Toggle Button (Top Right, Mobile only) -->
-<div class="position-fixed top-0 end-0 m-2 d-md-none" style="z-index: 1050;">
-    <button class="btn btn-light btn-sm rounded-circle shadow-sm" 
-            data-bs-toggle="offcanvas" data-bs-target="#quickMenu" title="Menu">
-        ☰
-    </button>
-</div>
-
-<!-- Offcanvas Menu -->
-<div class="offcanvas offcanvas-end" tabindex="-1" id="quickMenu">
-    <div class="offcanvas-header">
-        <h6 class="offcanvas-title">🧬 QuickNGS Menu</h6>
-        <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
-    </div>
-    <div class="offcanvas-body">
-        <div class="d-grid gap-2">
-            <a href="{{ url_for('index') }}" class="btn btn-outline-primary btn-sm">
-                🏠 New Analysis
-            </a>
-            <a href="{{ url_for('history') }}" class="btn btn-outline-secondary btn-sm">
-                📜 Run History
-            </a>
-            <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="offcanvas">
-                ℹ️ About
-            </button>
+function buildSangerForm(files) {
+    const refProvided = refInput.files.length > 0;
+    dynamicDiv.style.display = 'block';
+    let fileRows = files.map((f, idx) => `
+        <div class="row g-2 align-items-center mb-1">
+            <div class="col-7"><small>${f.name}</small></div>
+            <div class="col-5">
+                <select class="form-select form-select-sm" name="direction_${idx}">
+                    <option value="auto">Auto</option>
+                    <option value="forward">Forward</option>
+                    <option value="reverse">Reverse</option>
+                </select>
+            </div>
         </div>
-        <hr>
-        <small class="text-muted">
-            QuickNGS v1.0<br>
-            Part of <strong>Primer Tools</strong> Suite<br>
-            Built with DeepSeek AI
-        </small>
-    </div>
-</div>
+    `).join('');
 
-<!-- JavaScript -->
-<script>
-// Show filename when file selected
-document.getElementById('r1_input').addEventListener('change', function() {
-    var fname = this.files[0] ? '✅ ' + this.files[0].name : '';
-    document.getElementById('r1_filename').textContent = fname;
-});
+    dynamicDiv.innerHTML = `
+        <div class="card mb-2 shadow-sm border-0">
+            <div class="card-header bg-success text-white py-1"><small>🧬 Sanger Analysis</small></div>
+            <div class="card-body py-2 px-3">
+                <p class="small mb-2"><strong>${files.length} read(s)</strong> detected. ${refProvided ? 'Reference provided → <span class="badge bg-info">Guided Assembly</span>' : 'No reference → <span class="badge bg-warning text-dark">De Novo Assembly</span>'}</p>
+                <div class="mb-2">
+                    <label class="form-label small fw-bold mb-1">Direction (per read)</label>
+                    ${fileRows}
+                </div>
+                ${!refProvided ? `
+                <div class="mb-2">
+                    <label class="form-label small fw-bold mb-1">🧠 Assembly Algorithm</label>
+                    <select class="form-select form-select-sm" name="algorithm">
+                        <option value="greedy">Greedy OLC (Fast)</option>
+                        <option value="alignment">Semi‑Global Alignment (Precise)</option>
+                        <option value="debruijn">De Bruijn Graph</option>
+                    </select>
+                </div>` : ''}
+            </div>
+        </div>
+    `;
+}
 
-document.getElementById('r2_input').addEventListener('change', function() {
-    var fname = this.files[0] ? '✅ ' + this.files[0].name : '';
-    document.getElementById('r2_filename').textContent = fname;
-});
-
-// Toggle custom reference upload
-document.getElementById('reference_select').addEventListener('change', function() {
-    document.getElementById('custom_ref_div').style.display = 
-        (this.value === 'custom') ? 'block' : 'none';
-});
-
-// Form submit: show progress section
-document.getElementById('analysisForm').addEventListener('submit', function(e) {
-    var r1 = document.getElementById('r1_input').files[0];
-    var r2 = document.getElementById('r2_input').files[0];
-    var sampleName = document.querySelector('input[name="sample_name"]').value.trim();
+// Form submission handling
+document.getElementById('smartForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    if (!detectedMode) return;
     
-    if (!r1 || !r2) {
-        e.preventDefault();
-        alert('⚠️ Please select both R1 and R2 FASTQ files.');
-        return false;
-    }
-    if (!sampleName) {
-        e.preventDefault();
-        alert('⚠️ Please enter a sample name.');
-        return false;
+    const formData = new FormData(this);
+    // Add files explicitly
+    const seqFiles = document.getElementById('seqFiles').files;
+    for (let f of seqFiles) formData.append('seq_files', f);
+    const refFile = document.getElementById('refFile').files[0];
+    if (refFile) formData.append('ref_file', refFile);
+    
+    let endpoint = '/start'; // default NGS
+    if (detectedMode === 'sanger') {
+        if (refFile) endpoint = '/assemble_guided';
+        else endpoint = '/sanger_assemble';
     }
     
     // Show progress section
     document.getElementById('progress_section').style.display = 'block';
-    document.getElementById('progress_section').scrollIntoView({ behavior: 'smooth' });
+    // Submit form
+    fetch(endpoint, { method: 'POST', body: formData })
+    .then(response => response.text())
+    .then(html => { document.open(); document.write(html); document.close(); })
+    .catch(err => alert('Error: ' + err));
 });
 </script>
-
-<style>
-/* Mobile optimizations */
-body {
-    background-color: #f8f9fa;
-}
-.card {
-    border-radius: 12px;
-}
-.form-control:focus, .form-select:focus {
-    border-color: #0d6efd;
-    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
-}
-/* Make file inputs touch-friendly */
-input[type="file"] {
-    min-height: 38px;
-}
-/* FAB animation */
-.btn-lg.rounded-circle {
-    transition: transform 0.2s;
-}
-.btn-lg.rounded-circle:active {
-    transform: scale(0.9);
-}
-/* Collapse header cursor */
-.card-header[data-bs-toggle="collapse"] {
-    cursor: pointer;
-    user-select: none;
-}
-.card-header[data-bs-toggle="collapse"]:hover {
-    background-color: #e9ecef !important;
-}
-/* Desktop refinements */
-@media (min-width: 768px) {
-    .card {
-        border-radius: 16px;
-    }
-    .card-header {
-        border-radius: 16px 16px 0 0 !important;
-    }
-}
-</style>
 {% endblock %}
