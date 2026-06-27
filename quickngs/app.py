@@ -476,6 +476,15 @@ def download_file(run_id, filename):
         return send_file(file_path, as_attachment=True)
     return jsonify({"status": "error", "message": "File not found."}), 404
 
+# ---------- Info Pages (New, low risk) ----------
+@app.route('/about')
+def about_page():
+    return render_template('about.html')
+
+@app.route('/help')
+def help_page():
+    return render_template('help.html')
+
 # ---------- Run ----------
 if __name__ == '__main__':
     print("=" * 50)
