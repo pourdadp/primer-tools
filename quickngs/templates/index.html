@@ -71,7 +71,6 @@ const projectInput = document.getElementById('projectName');
 const dynamicDiv = document.getElementById('dynamicSettings');
 const startBtn = document.getElementById('startBtn');
 let detectedMode = null;  // 'ngs' or 'sanger'
-let sangerFileNames = [];
 
 seqInput.addEventListener('change', function() {
     const files = Array.from(this.files);
@@ -102,7 +101,6 @@ seqInput.addEventListener('change', function() {
     } else {
         // Sanger mode
         detectedMode = 'sanger';
-        sangerFileNames = files.map(f => f.name);
         buildSangerForm(files);
     }
 
@@ -190,15 +188,46 @@ function buildSangerForm(files) {
         </div>
     `).join('');
 
+    // Check if any AB1 files are present (for quality trimming option)
+    const hasAB1 = files.some(f => f.name.toLowerCase().endsWith('.ab1'));
+
     dynamicDiv.innerHTML = `
         <div class="card mb-2 shadow-sm border-0">
             <div class="card-header bg-success text-white py-1"><small>🧬 Sanger Analysis</small></div>
             <div class="card-body py-2 px-3">
-                <p class="small mb-2"><strong>${files.length} read(s)</strong> detected. ${refProvided ? 'Reference provided → <span class="badge bg-info">Guided Assembly</span>' : 'No reference → <span class="badge bg-warning text-dark">De Novo Assembly</span>'}</p>
+                <p class="small mb-2">
+                    <strong>${files.length} read(s)</strong> detected.
+                    ${refProvided ? 'Reference provided → <span class="badge bg-info">Guided Assembly</span>' : 'No reference → <span class="badge bg-warning text-dark">De Novo Assembly</span>'}
+                </p>
+                
                 <div class="mb-2">
                     <label class="form-label small fw-bold mb-1">Direction (per read)</label>
                     ${fileRows}
                 </div>
+
+                ${hasAB1 ? `
+                <div class="card bg-light mb-2">
+                    <div class="card-body py-2 px-2">
+                        <div class="form-check form-switch mb-1">
+                            <input class="form-check-input" type="checkbox" name="trim_quality" id="trimQuality" checked>
+                            <label class="form-check-label small" for="trimQuality">
+                                ✂️ Trim low‑quality ends (Phred scores)
+                            </label>
+                        </div>
+                        <div id="qualityParams" class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label small mb-1">Min Quality (Q)</label>
+                                <input type="number" class="form-control form-control-sm" name="quality_threshold" value="20" min="5" max="40">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small mb-1">Window Size</label>
+                                <input type="number" class="form-control form-control-sm" name="window_size" value="5" min="1" max="20">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
+
                 ${!refProvided ? `
                 <div class="mb-2">
                     <label class="form-label small fw-bold mb-1">🧠 Assembly Algorithm</label>
@@ -211,6 +240,14 @@ function buildSangerForm(files) {
             </div>
         </div>
     `;
+    
+    // Toggle quality params visibility
+    const trimCheckbox = document.getElementById('trimQuality');
+    if (trimCheckbox) {
+        trimCheckbox.addEventListener('change', function() {
+            document.getElementById('qualityParams').style.display = this.checked ? 'flex' : 'none';
+        });
+    }
 }
 
 // Form submission handling
