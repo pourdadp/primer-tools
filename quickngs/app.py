@@ -476,7 +476,19 @@ def download_file(run_id, filename):
         return send_file(file_path, as_attachment=True)
     return jsonify({"status": "error", "message": "File not found."}), 404
 
-# ---------- Info Pages (New, low risk) ----------
+# ---------- Delete run ----------
+@app.route('/delete/<run_id>', methods=['DELETE'])
+def delete_run(run_id):
+    run_dir = os.path.join(RESULTS_FOLDER, run_id)
+    if os.path.isdir(run_dir):
+        try:
+            shutil.rmtree(run_dir)
+            return jsonify({"status": "ok"})
+        except OSError as e:
+            return jsonify({"status": "error", "message": str(e)}), 500
+    return jsonify({"status": "error", "message": "Run not found."}), 404
+
+# ---------- Info Pages ----------
 @app.route('/about')
 def about_page():
     return render_template('about.html')
