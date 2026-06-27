@@ -1,30 +1,68 @@
 {% extends "base.html" %}
-{% block title %}Analysis Started - QuickNGS{% endblock %}
+{% block title %}Assembly Result – QuickNGS{% endblock %}
 {% block content %}
-<div class="container py-4 text-center">
-    <h4>🚀 Analysis Started</h4>
-    <p>Run ID: <strong>{{ run_id }}</strong></p>
-    <div class="progress mb-3" style="height: 25px;">
-        <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%">0%</div>
+<div class="container py-3">
+    <div class="mx-auto" style="max-width: 900px;">
+        <h4 class="fw-bold">🧬 Assembly Result</h4>
+        <p class="text-muted small">Mode: {{ result.mode }} | Reads used: {{ result.reads_count }}</p>
+
+        <div class="card mb-3 shadow-sm">
+            <div class="card-header bg-success text-white py-2"><strong>Contig ({{ result.contig|length }} bp)</strong></div>
+            <div class="card-body bg-light">
+                <pre style="font-family: monospace; white-space: pre-wrap; word-break: break-all;">{{ result.contig }}</pre>
+            </div>
+        </div>
+
+        {% if result.placements %}
+        <div class="card mb-3">
+            <div class="card-header py-2"><strong>Read Alignment Graph</strong></div>
+            <div class="card-body p-2">
+                <canvas id="graphCanvas" width="800" height="300" style="width:100%;"></canvas>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-primary" onclick="copyContig()">📋 Copy Contig</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="saveContig()">💾 Save .fasta</button>
+            <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline-primary">🔄 New Analysis</a>
+        </div>
     </div>
-    <p id="stepText">Starting pipeline...</p>
-    <a href="/results/{{ run_id }}" class="btn btn-outline-primary btn-sm" id="viewResultsBtn" style="display:none;">View Final Results</a>
 </div>
 
 <script>
-const runId = "{{ run_id }}";
-const interval = setInterval(() => {
-    fetch('/status/' + runId)
-        .then(r => r.json())
-        .then(data => {
-            document.getElementById('progressBar').style.width = data.progress + '%';
-            document.getElementById('progressBar').textContent = data.progress + '%';
-            document.getElementById('stepText').textContent = data.step;
-            if (data.progress >= 100) {
-                clearInterval(interval);
-                document.getElementById('viewResultsBtn').style.display = 'inline-block';
-            }
-        });
-}, 1500);
+const contig = {{ result.contig|tojson }};
+const placements = {{ result.placements|tojson }};
+
+function copyContig() {
+    navigator.clipboard.writeText(contig).then(() => alert('Contig copied!'));
+}
+function saveContig() {
+    const blob = new Blob([contig], {type: 'text/plain'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'contig.fasta';
+    a.click();
+}
+
+if (placements && placements.length) {
+    const canvas = document.getElementById('graphCanvas');
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width - 100;
+    const scale = w / contig.length;
+    placements.forEach((p, i) => {
+        const y = 30 + i * 25;
+        const x1 = 50 + p.start * scale;
+        const x2 = 50 + (p.end + 1) * scale;
+        ctx.fillStyle = '#dc3545';
+        ctx.fillRect(x1, y, x2 - x1, 20);
+        if (p.mismatches && p.mismatches.length) {
+            ctx.fillStyle = '#ffc107';
+            p.mismatches.forEach(pos => {
+                ctx.fillRect(50 + pos * scale, y, scale, 20);
+            });
+        }
+    });
+}
 </script>
 {% endblock %}
