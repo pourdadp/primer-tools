@@ -147,19 +147,29 @@ function buildNGSForm(files) {
                         <label class="form-label small mb-1">
                             Min Quality (Q)
                             <span class="help-icon">?
-                                <span class="help-tooltip">Phred quality threshold for trimming (Q20 = 1% error).</span>
+                                <span class="help-tooltip">Minimum Phred quality for trimming. Q20 = 1% error rate. Lower values keep more bases.</span>
                             </span>
                         </label>
                         <input type="number" class="form-control form-control-sm" name="min_quality" value="20">
                     </div>
                     <div class="col-md-3 mb-2">
-                        <label class="form-label small mb-1">Min Depth</label>
+                        <label class="form-label small mb-1">
+                            Min Depth
+                            <span class="help-icon">?
+                                <span class="help-tooltip">Minimum number of reads covering a position to call a variant. Higher values increase confidence.</span>
+                            </span>
+                        </label>
                         <input type="number" class="form-control form-control-sm" name="min_depth" value="10">
                     </div>
                 </div>
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" name="trim_adapters" id="trimAdapters" checked>
-                    <label class="form-check-label small" for="trimAdapters">Trim Adapters</label>
+                    <label class="form-check-label small" for="trimAdapters">
+                        Trim Adapters
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Remove sequencing adapters and low‑quality bases from the ends of reads (Trimmomatic).</span>
+                        </span>
+                    </label>
                 </div>
             </div>
         </div>
@@ -217,6 +227,9 @@ function buildSangerForm(files) {
                             <input class="form-check-input" type="checkbox" name="trim_quality" id="trimQuality" checked>
                             <label class="form-check-label small" for="trimQuality">
                                 ✂️ Trim low‑quality ends (Phred scores)
+                                <span class="help-icon">?
+                                    <span class="help-tooltip">If checked, the beginning and end of the sequence are trimmed when their average quality (over the window) falls below the threshold.</span>
+                                </span>
                             </label>
                         </div>
                         <div id="qualityParams" class="row g-2">
@@ -233,7 +246,7 @@ function buildSangerForm(files) {
                                 <label class="form-label small mb-1">
                                     Window Size
                                     <span class="help-icon">?
-                                        <span class="help-tooltip">Number of consecutive bases used to compute average quality. Larger values smooth out noise.</span>
+                                        <span class="help-tooltip">Number of consecutive bases averaged to decide trimming. Larger windows smooth out random quality drops.</span>
                                     </span>
                                 </label>
                                 <input type="number" class="form-control form-control-sm" name="window_size" value="5" min="1" max="20">
@@ -265,7 +278,31 @@ function buildSangerForm(files) {
     }
 }
 
-// Rest of existing JavaScript (seqInput change, form submit, etc.) unchanged
-// ...
+// ---------- Form submission handling ----------
+document.getElementById('smartForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    if (!detectedMode) return;
+    
+    const formData = new FormData(this);
+    // Add files explicitly
+    const seqFiles = document.getElementById('seqFiles').files;
+    for (let f of seqFiles) formData.append('seq_files', f);
+    const refFile = document.getElementById('refFile').files[0];
+    if (refFile) formData.append('ref_file', refFile);
+    
+    let endpoint = '/start'; // default NGS
+    if (detectedMode === 'sanger') {
+        if (refFile) endpoint = '/assemble_guided';
+        else endpoint = '/sanger_assemble';
+    }
+    
+    // Show progress section
+    document.getElementById('progress_section').style.display = 'block';
+    // Submit form
+    fetch(endpoint, { method: 'POST', body: formData })
+    .then(response => response.text())
+    .then(html => { document.open(); document.write(html); document.close(); })
+    .catch(err => alert('Error: ' + err));
+});
 </script>
 {% endblock %}
