@@ -3,7 +3,7 @@
 {% block title %}About – QuickNGS{% endblock %}
 {% block content %}
 <div class="container py-4">
-    <div class="mx-auto" style="max-width: 700px;">
+    <div class="mx-auto" style="max-width: 800px;">
         <h3 class="fw-bold">🧬 About QuickNGS</h3>
         <p class="text-muted">Version 2.0 – NGS &amp; Sanger Analysis Suite</p>
         <hr>
@@ -11,12 +11,22 @@
             <strong>QuickNGS</strong> is a smart, browser‑based platform that automatically detects the type of sequencing data you upload
             (FASTQ → NGS, AB1/FASTA/seq → Sanger) and runs the appropriate analysis pipeline.
         </p>
+
+        <h5>🔧 Tools Used</h5>
         <ul>
-            <li><strong>NGS (Reference‑Based):</strong> FastQC → Trimmomatic → BWA → Samtools → FreeBayes → SnpEff → Clinical report</li>
-            <li><strong>Sanger (De Novo):</strong> Greedy OLC / Semi‑Global Alignment / De Bruijn Graph assembly</li>
-            <li><strong>Sanger (Guided):</strong> Align to reference with BWA, generate consensus, report variants</li>
+            <li><strong>NGS Pipeline:</strong> FastQC, Trimmomatic, BWA, Samtools, FreeBayes, SnpEff</li>
+            <li><strong>De Novo Assembly:</strong> Greedy OLC, Semi‑Global Alignment, De Bruijn Graph</li>
+            <li><strong>Guided Assembly:</strong> BWA + Samtools + BCFtools consensus</li>
+            <li><strong>Frontend:</strong> Bootstrap 5, Chart.js, JavaScript (Vanilla)</li>
+            <li><strong>Backend:</strong> Python, Flask, Biopython, PyYAML, Plotly</li>
         </ul>
-        <p>All analyses are saved automatically and can be reviewed at any time from the History page.</p>
+
+        <h5>📂 Part of Primer Tools Suite</h5>
+        <p>
+            QuickNGS works seamlessly with <a href="https://github.com/pourdadp/primer-tools" target="_blank">Primer Database Manager (PDM)</a>
+            and <a href="https://github.com/pourdadp/primer-tools" target="_blank">Sequencing Panel Optimizer (SPO)</a>.
+        </p>
+
         <hr>
         <p>
             Built by <strong>Pourdad Panahi</strong><br>
