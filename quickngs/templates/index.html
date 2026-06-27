@@ -21,7 +21,10 @@
                     <input type="file" class="form-control form-control-sm" id="seqFiles"
                            name="seq_files" multiple
                            accept=".fastq,.fq,.gz,.ab1,.seq,.fasta,.fa">
-                    <small class="text-muted">Select one or more files. NGS: paired FASTQ. Sanger: AB1/seq/FASTA.</small>
+                    <small class="text-muted">
+                        <strong>NGS:</strong> exactly two paired FASTQ files (R1 &amp; R2).<br>
+                        <strong>Sanger:</strong> one or more AB1, FASTA, or plain text files.
+                    </small>
                     <div id="fileList" class="mt-2"></div>
                 </div>
             </div>
@@ -164,6 +167,7 @@ seqInput.addEventListener('change', function() {
         detectedMode = 'ngs';
         buildNGSForm(files);
     } else {
+        // Sanger mode – works with 1 or more files
         detectedMode = 'sanger';
         buildSangerForm(files);
     }
