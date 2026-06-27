@@ -10,7 +10,17 @@ Powered by Pourdad Panahi – Built with DeepSeek AI
 
 from Bio import SeqIO
 from io import StringIO
-import os, subprocess, tempfile
+import os
+import subprocess
+import tempfile
+
+# ---------- Tool availability check ----------
+def is_tool_available(tool_name):
+    try:
+        subprocess.run([tool_name], capture_output=True, check=False)
+        return True
+    except FileNotFoundError:
+        return False
 
 # ---------- Quality Trimming ----------
 def trim_by_quality(seq, qualities, threshold=20, window=5):
@@ -356,10 +366,16 @@ def merge_clusters(contigs, min_overlap=10, max_mismatch=0):
 
 # ---------- Guided Assembly ----------
 def guided_assemble_fastq(r1_fastq, r2_fastq, ref_fasta, results_folder):
+    # Check required tools
+    for tool in ['bwa', 'samtools', 'bcftools']:
+        if not is_tool_available(tool):
+            raise RuntimeError(f"{tool} is not installed. Please install it before running guided assembly.")
+    
     sample = os.path.basename(r1_fastq).replace('_R1.fastq', '')
     sam_file = os.path.join(results_folder, f"{sample}.sam")
     bam_file = os.path.join(results_folder, f"{sample}.bam")
     sorted_bam = os.path.join(results_folder, f"{sample}.sorted.bam")
+    
     with open(sam_file, 'w') as out:
         subprocess.run(['bwa', 'mem', '-M', '-R', f'@RG\\tID:{sample}\\tSM:{sample}', ref_fasta, r1_fastq, r2_fastq],
                        stdout=out, stderr=subprocess.PIPE, check=True)
@@ -367,13 +383,16 @@ def guided_assemble_fastq(r1_fastq, r2_fastq, ref_fasta, results_folder):
         subprocess.run(['samtools', 'view', '-bS', sam_file], stdout=out, check=True)
     subprocess.run(['samtools', 'sort', '-o', sorted_bam, bam_file], check=True)
     subprocess.run(['samtools', 'index', sorted_bam], check=True)
+    
     consensus_file = os.path.join(results_folder, f"{sample}_consensus.fa")
     with open(consensus_file, 'w') as out:
         p1 = subprocess.run(['samtools', 'mpileup', '-uf', ref_fasta, sorted_bam], capture_output=True, check=True)
         p2 = subprocess.run(['bcftools', 'call', '-c'], input=p1.stdout, capture_output=True, check=True)
         p3 = subprocess.run(['bcftools', 'consensus', '-f', ref_fasta], input=p2.stdout, stdout=out, check=True)
+    
     with open(consensus_file) as f:
         contig = f.read().strip()
+    
     avg_depth, cov_20x = 0, 0
     try:
         depth_out = subprocess.run(['samtools', 'depth', sorted_bam], capture_output=True, text=True)
@@ -383,6 +402,7 @@ def guided_assemble_fastq(r1_fastq, r2_fastq, ref_fasta, results_folder):
             cov_20x = sum(1 for d in depths if d >= 20) / len(depths) * 100
     except:
         pass
+    
     return {
         'contig': contig, 'variants': [], 'avg_depth': avg_depth,
         'coverage_20x': cov_20x,
@@ -408,7 +428,6 @@ def assemble_reads_from_files(filepaths, mode='greedy', min_overlap=3, max_misma
     clusters = cluster_reads(reads, min_overlap, max_mismatch)
 
     if len(clusters) > 1:
-        # Multiple clusters – assemble each, then try to merge
         contigs = []
         cluster_read_indices = []
         for indices in clusters:
