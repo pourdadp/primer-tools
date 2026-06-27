@@ -1,0 +1,29 @@
+<!-- templates/about.html -->
+{% extends "base.html" %}
+{% block title %}About – QuickNGS{% endblock %}
+{% block content %}
+<div class="container py-4">
+    <div class="mx-auto" style="max-width: 700px;">
+        <h3 class="fw-bold">🧬 About QuickNGS</h3>
+        <p class="text-muted">Version 2.0 – NGS &amp; Sanger Analysis Suite</p>
+        <hr>
+        <p>
+            <strong>QuickNGS</strong> is a smart, browser‑based platform that automatically detects the type of sequencing data you upload
+            (FASTQ → NGS, AB1/FASTA/seq → Sanger) and runs the appropriate analysis pipeline.
+        </p>
+        <ul>
+            <li><strong>NGS (Reference‑Based):</strong> FastQC → Trimmomatic → BWA → Samtools → FreeBayes → SnpEff → Clinical report</li>
+            <li><strong>Sanger (De Novo):</strong> Greedy OLC / Semi‑Global Alignment / De Bruijn Graph assembly</li>
+            <li><strong>Sanger (Guided):</strong> Align to reference with BWA, generate consensus, report variants</li>
+        </ul>
+        <p>All analyses are saved automatically and can be reviewed at any time from the History page.</p>
+        <hr>
+        <p>
+            Built by <strong>Pourdad Panahi</strong><br>
+            Biotechnologist &amp; Computational Biologist with 18+ years of wet‑lab experience.<br>
+            <a href="https://github.com/pourdadp/primer-tools" target="_blank">View on GitHub</a>
+        </p>
+        <p class="small text-muted">Powered by DeepSeek AI</p>
+    </div>
+</div>
+{% endblock %}
