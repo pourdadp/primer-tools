@@ -1,68 +1,116 @@
+<!-- templates/assemble_result.html -->
 {% extends "base.html" %}
 {% block title %}Assembly Result – QuickNGS{% endblock %}
 {% block content %}
 <div class="container py-3">
     <div class="mx-auto" style="max-width: 900px;">
         <h4 class="fw-bold">🧬 Assembly Result</h4>
-        <p class="text-muted small">Mode: {{ result.mode }} | Reads used: {{ result.reads_count }}</p>
+        <p class="text-muted small">
+            Mode: {{ result.mode }} | Total reads: {{ result.reads_count }}
+            {% if result.multi_cluster %}
+                | Initial clusters: {{ result.initial_clusters }} | Final contigs: {{ result.total_clusters }}
+            {% endif %}
+            {% if result.trimmed %} | ✂️ Quality trimmed{% endif %}
+        </p>
 
-        <div class="card mb-3 shadow-sm">
-            <div class="card-header bg-success text-white py-2"><strong>Contig ({{ result.contig|length }} bp)</strong></div>
-            <div class="card-body bg-light">
-                <pre style="font-family: monospace; white-space: pre-wrap; word-break: break-all;">{{ result.contig }}</pre>
+        {% if result.all_contigs %}
+            {% for contig_data in result.all_contigs %}
+            <div class="card mb-3 shadow-sm">
+                <div class="card-header bg-success text-white py-2">
+                    <strong>Contig {{ contig_data.cluster_id }}</strong>
+                    ({{ contig_data.length }} bp, {{ contig_data.reads_used }} reads)
+                    {% if contig_data.merged_from %}
+                        <span class="badge bg-warning text-dark ms-2">⚡ Merged from clusters {{ contig_data.merged_from|join(', ') }}</span>
+                    {% endif %}
+                </div>
+                <div class="card-body bg-light py-2 px-3">
+                    <!-- Graphical Bar -->
+                    <canvas id="graph_{{ contig_data.cluster_id }}" width="800" height="60" style="width:100%; max-height:60px;"></canvas>
+                    
+                    <!-- Sequence -->
+                    <pre style="font-family: monospace; white-space: pre-wrap; word-break: break-all; max-height: 150px; overflow-y: auto; margin-top: 8px;">{{ contig_data.contig }}</pre>
+                </div>
+                <div class="card-footer py-1 px-3">
+                    <small class="text-muted">Reads used: {{ contig_data.read_names|join(', ') }}</small>
+                </div>
             </div>
-        </div>
-
-        {% if result.placements %}
-        <div class="card mb-3">
-            <div class="card-header py-2"><strong>Read Alignment Graph</strong></div>
-            <div class="card-body p-2">
-                <canvas id="graphCanvas" width="800" height="300" style="width:100%;"></canvas>
-            </div>
-        </div>
+            {% endfor %}
+        {% else %}
+            <div class="alert alert-warning">No contig assembled.</div>
         {% endif %}
 
-        <div class="d-flex gap-2">
-            <button class="btn btn-sm btn-primary" onclick="copyContig()">📋 Copy Contig</button>
-            <button class="btn btn-sm btn-outline-secondary" onclick="saveContig()">💾 Save .fasta</button>
+        <div class="d-flex gap-2 mt-3">
+            <button class="btn btn-sm btn-primary" onclick="copyAllContigs()">📋 Copy All Contigs</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="saveAllContigs()">💾 Save All (.fasta)</button>
             <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline-primary">🔄 New Analysis</a>
         </div>
     </div>
 </div>
 
 <script>
-const contig = {{ result.contig|tojson }};
-const placements = {{ result.placements|tojson }};
+const allContigs = {{ result.all_contigs|tojson }};
 
-function copyContig() {
-    navigator.clipboard.writeText(contig).then(() => alert('Contig copied!'));
+// Draw graphical bar for each contig
+allContigs.forEach(contig => {
+    const canvas = document.getElementById('graph_' + contig.cluster_id);
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    const width = canvas.parentElement.clientWidth - 20;
+    canvas.width = width;
+    
+    const x = 10, barHeight = 30, y = 15;
+    const maxWidth = width - 20;
+    
+    // Draw background bar (total length)
+    ctx.fillStyle = '#e9ecef';
+    ctx.fillRect(x, y, maxWidth, barHeight);
+    
+    // If merged, draw segments with different colors
+    if (contig.merged_from && contig.merged_from.length > 1) {
+        const colors = ['#198754', '#0d6efd', '#6f42c1', '#fd7e14', '#d63384'];
+        const segmentWidth = maxWidth / contig.merged_from.length;
+        contig.merged_from.forEach((clusterId, i) => {
+            ctx.fillStyle = colors[i % colors.length];
+            ctx.fillRect(x + i * segmentWidth, y, segmentWidth, barHeight);
+            // Label
+            ctx.fillStyle = 'white';
+            ctx.font = '10px sans-serif';
+            ctx.fillText('C' + clusterId, x + i * segmentWidth + 5, y + barHeight - 8);
+        });
+    } else {
+        // Single cluster: show coverage intensity based on read count
+        const intensity = Math.min(contig.reads_used / 10, 1); // max at 10 reads
+        const r = Math.floor(25 + (1 - intensity) * 200);
+        const g = Math.floor(135 - (1 - intensity) * 100);
+        const b = Math.floor(84 - (1 - intensity) * 50);
+        ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+        ctx.fillRect(x, y, maxWidth, barHeight);
+        
+        // Label
+        ctx.fillStyle = 'white';
+        ctx.font = '10px sans-serif';
+        ctx.fillText(contig.length + ' bp (' + contig.reads_used + ' reads)', x + 10, y + barHeight - 8);
+    }
+    
+    // Draw border
+    ctx.strokeStyle = '#495057';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, maxWidth, barHeight);
+});
+
+function copyAllContigs() {
+    let text = allContigs.map(c => `>contig_${c.cluster_id} (${c.length} bp, ${c.reads_used} reads)\n${c.contig}`).join('\n\n');
+    navigator.clipboard.writeText(text).then(() => alert('All contigs copied!'));
 }
-function saveContig() {
-    const blob = new Blob([contig], {type: 'text/plain'});
+
+function saveAllContigs() {
+    let text = allContigs.map(c => `>contig_${c.cluster_id} (${c.length} bp, ${c.reads_used} reads)\n${c.contig}`).join('\n\n');
+    const blob = new Blob([text], {type: 'text/plain'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'contig.fasta';
+    a.download = 'all_contigs.fasta';
     a.click();
-}
-
-if (placements && placements.length) {
-    const canvas = document.getElementById('graphCanvas');
-    const ctx = canvas.getContext('2d');
-    const w = canvas.width - 100;
-    const scale = w / contig.length;
-    placements.forEach((p, i) => {
-        const y = 30 + i * 25;
-        const x1 = 50 + p.start * scale;
-        const x2 = 50 + (p.end + 1) * scale;
-        ctx.fillStyle = '#dc3545';
-        ctx.fillRect(x1, y, x2 - x1, 20);
-        if (p.mismatches && p.mismatches.length) {
-            ctx.fillStyle = '#ffc107';
-            p.mismatches.forEach(pos => {
-                ctx.fillRect(50 + pos * scale, y, scale, 20);
-            });
-        }
-    });
 }
 </script>
 {% endblock %}
