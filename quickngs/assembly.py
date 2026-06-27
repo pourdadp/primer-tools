@@ -1,8 +1,10 @@
+# quickngs/assembly.py
 """
 DNA Assembly Module for QuickNGS
 Algorithms: Greedy OLC, Semi‑Global Alignment, De Bruijn Graph
 Supports AB1, FASTA, seq formats via Biopython
-Handles multiple files, orientation control, quality trimming, and reference‑guided assembly.
+Handles multiple files, orientation control, quality trimming,
+intelligent clustering, and optional cluster merging.
 Powered by Pourdad Panahi – Built with DeepSeek AI
 """
 
@@ -12,37 +14,24 @@ import os, subprocess, tempfile
 
 # ---------- Quality Trimming ----------
 def trim_by_quality(seq, qualities, threshold=20, window=5):
-    """
-    Trim low-quality ends from a sequence based on Phred scores.
-    Returns trimmed sequence and trimmed qualities list.
-    """
     if not qualities or len(qualities) != len(seq):
-        return seq, qualities  # No quality data
-    
-    # Trim from start
+        return seq, qualities
     start = 0
     for i in range(0, len(qualities) - window + 1):
         avg = sum(qualities[i:i+window]) / window
         if avg >= threshold:
             start = i
             break
-    
-    # Trim from end
     end = len(qualities)
     for i in range(len(qualities) - window, -1, -1):
         avg = sum(qualities[i:i+window]) / window
         if avg >= threshold:
             end = i + window
             break
-    
     return seq[start:end], qualities[start:end]
 
 # ---------- File parsing ----------
 def parse_uploaded_file(filepath, trim_low_quality=False, quality_threshold=20, window_size=5):
-    """
-    Parse uploaded file and return list of sequences.
-    If AB1 file and trim_low_quality is True, quality trimming is applied.
-    """
     filename = os.path.basename(filepath).lower()
     sequences = []
     try:
@@ -50,20 +39,15 @@ def parse_uploaded_file(filepath, trim_low_quality=False, quality_threshold=20, 
             record = SeqIO.read(filepath, 'abi')
             seq = str(record.seq)
             quals = record.letter_annotations.get('phred_quality', None)
-            
             if trim_low_quality and quals:
                 original_len = len(seq)
                 seq, quals = trim_by_quality(seq, quals, quality_threshold, window_size)
-                # Log trimming info (optional)
-                print(f"  [Quality Trim] {filename}: {original_len}bp → {len(seq)}bp (threshold Q{quality_threshold}, window {window_size})")
-            
+                print(f"  [Quality Trim] {filename}: {original_len}bp → {len(seq)}bp (Q{quality_threshold}, W{window_size})")
             sequences.append(seq)
-            
         elif filename.endswith(('.fasta', '.fa', '.fna')):
             for record in SeqIO.parse(filepath, 'fasta'):
                 sequences.append(str(record.seq))
-                
-        else:  # plain text / seq
+        else:
             with open(filepath, 'r') as f:
                 lines = f.read().strip().split('\n')
                 if lines and lines[0].startswith('>'):
@@ -76,7 +60,6 @@ def parse_uploaded_file(filepath, trim_low_quality=False, quality_threshold=20, 
     return sequences
 
 def parse_uploaded_files(filepaths, trim_low_quality=False, quality_threshold=20, window_size=5):
-    """Parse multiple files and return combined list of sequences."""
     all_reads = []
     for fp in filepaths:
         all_reads.extend(parse_uploaded_file(fp, trim_low_quality, quality_threshold, window_size))
@@ -87,7 +70,7 @@ def reverse_complement(seq):
     comp = {'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C'}
     return ''.join(comp.get(b, b) for b in reversed(seq))
 
-# ---------- Greedy OLC (with orientation control) ----------
+# ---------- Overlap detection ----------
 def fuzzy_overlap_ok(suffix, prefix, max_mismatch):
     run = 0
     for i in range(len(suffix)):
@@ -113,6 +96,7 @@ def find_overlap(a, b, min_len, fuzzy_threshold=50, max_mismatch=3):
                 best = i
     return best
 
+# ---------- Greedy OLC ----------
 def greedy_assemble(reads, min_overlap=3, fuzzy_threshold=50, max_mismatch=3, orientation='auto'):
     if not reads:
         return {'contig': '', 'steps': [], 'placements': [], 'remaining': [], 'total': 0}
@@ -127,7 +111,6 @@ def greedy_assemble(reads, min_overlap=3, fuzzy_threshold=50, max_mismatch=3, or
         extended = True
         while temp_reads and extended:
             contig = resolve_and_build(placements)
-            # Containment check
             best_action = None
             for i, read in enumerate(temp_reads):
                 if contig.find(read) != -1 or (orientation != 'forward' and contig.find(reverse_complement(read)) != -1):
@@ -137,18 +120,14 @@ def greedy_assemble(reads, min_overlap=3, fuzzy_threshold=50, max_mismatch=3, or
                 temp_reads.pop(best_action['idx'])
                 steps.append({'seq': best_action['read'], 'type': 'contained'})
                 continue
-            
-            # Find best overlap
             best_overlap, best_idx, best_ori, best_side, best_seq = 0, -1, 'f', 'right', None
             for i, read in enumerate(temp_reads):
-                # Forward
                 ov = find_overlap(contig, read, min_overlap, fuzzy_threshold, max_mismatch)
                 if ov > best_overlap:
                     best_overlap, best_idx, best_ori, best_side, best_seq = ov, i, 'f', 'right', read
                 ov = find_overlap(read, contig, min_overlap, fuzzy_threshold, max_mismatch)
                 if ov > best_overlap:
                     best_overlap, best_idx, best_ori, best_side, best_seq = ov, i, 'f', 'left', read
-                # Reverse
                 if orientation != 'forward':
                     rc = reverse_complement(read)
                     ov = find_overlap(contig, rc, min_overlap, fuzzy_threshold, max_mismatch)
@@ -157,16 +136,12 @@ def greedy_assemble(reads, min_overlap=3, fuzzy_threshold=50, max_mismatch=3, or
                     ov = find_overlap(rc, contig, min_overlap, fuzzy_threshold, max_mismatch)
                     if ov > best_overlap:
                         best_overlap, best_idx, best_ori, best_side, best_seq = ov, i, 'r', 'left', rc
-            
             if best_idx == -1:
                 extended = False
                 break
-            
             chosen_read = temp_reads.pop(best_idx)
             oriented_seq = best_seq if best_ori == 'f' else reverse_complement(chosen_read)
             steps.append({'seq': chosen_read, 'type': 'add', 'orientation': best_ori, 'side': best_side, 'overlap': best_overlap})
-            
-            # Track mismatches
             mismatch_set = set()
             if best_overlap >= fuzzy_threshold:
                 if best_side == 'right':
@@ -178,7 +153,6 @@ def greedy_assemble(reads, min_overlap=3, fuzzy_threshold=50, max_mismatch=3, or
                     for j in range(best_overlap):
                         if oriented_seq[len(oriented_seq) - best_overlap + j] != contig[j]:
                             mismatch_set.add(j)
-            
             if best_side == 'right':
                 placements.append({'seq': chosen_read, 'start': len(contig) - best_overlap,
                                    'end': len(contig) - best_overlap + len(oriented_seq) - 1,
@@ -189,12 +163,10 @@ def greedy_assemble(reads, min_overlap=3, fuzzy_threshold=50, max_mismatch=3, or
                     p['start'] += shift
                     p['end'] += shift
                 placements.append({'seq': chosen_read, 'start': 0, 'end': len(oriented_seq) - 1, 'mismatches': set()})
-        
         contig = resolve_and_build(placements)
         if len(contig) > len(best_contig):
             best_contig, best_steps, best_placements, best_remaining = contig, steps, placements, temp_reads[:]
             break
-    
     return {'contig': best_contig, 'steps': best_steps, 'placements': best_placements,
             'remaining': best_remaining, 'total': len(sorted_reads)}
 
@@ -230,8 +202,6 @@ def semi_global_align(seq1, seq2):
             score[i][j] = best
             if best > max_score:
                 max_score, max_i, max_j = best, i, j
-    
-    # Traceback
     i, j = max_i, max_j
     matches = contig_start = read_start = 0
     while i > 0 and j > 0 and score[i][j] > 0:
@@ -246,7 +216,6 @@ def semi_global_align(seq1, seq2):
         else:
             break
         contig_start, read_start = i, j
-    
     return {'score': max_score, 'matches': matches, 'contig_start': contig_start, 'contig_end': max_i,
             'read_start': read_start, 'read_end': max_j}
 
@@ -260,7 +229,6 @@ def merge_read_to_contig(contig, read, min_overlap, orientation='auto'):
         if aln_rc['matches'] > aln['matches']:
             best_aln = aln_rc
             best_orientation = 'reverse'
-    
     if best_aln['matches'] >= min_overlap:
         read_seq = read if best_orientation == 'forward' else reverse_complement(read)
         left_overhang = read_seq[:best_aln['read_start']]
@@ -312,13 +280,86 @@ def debruijn_assemble(reads, k=3):
         current = next_node
     return contig
 
-# ---------- Reference‑Guided assembly ----------
+# ---------- Intelligent Clustering ----------
+def cluster_reads(reads, min_overlap=3, max_mismatch=3):
+    n = len(reads)
+    graph = {i: set() for i in range(n)}
+    for i in range(n):
+        for j in range(i+1, n):
+            ov = find_overlap(reads[i], reads[j], min_overlap, 50, max_mismatch)
+            if ov >= min_overlap:
+                graph[i].add(j)
+                graph[j].add(i)
+            else:
+                ov = find_overlap(reads[j], reads[i], min_overlap, 50, max_mismatch)
+                if ov >= min_overlap:
+                    graph[i].add(j)
+                    graph[j].add(i)
+    visited = set()
+    clusters = []
+    for i in range(n):
+        if i not in visited:
+            component = []
+            stack = [i]
+            while stack:
+                node = stack.pop()
+                if node not in visited:
+                    visited.add(node)
+                    component.append(node)
+                    stack.extend(graph[node] - visited)
+            clusters.append(component)
+    return clusters
+
+# ---------- Cluster Merging (Scaffolding) ----------
+def merge_clusters(contigs, min_overlap=10, max_mismatch=0):
+    if len(contigs) <= 1:
+        return contigs, {i: [i+1] for i in range(len(contigs))}
+    n = len(contigs)
+    merged = list(contigs)
+    merge_map = {i: [i] for i in range(n)}
+    changed = True
+    while changed:
+        changed = False
+        for i in range(len(merged)):
+            for j in range(i+1, len(merged)):
+                if not merged[i] or not merged[j]:
+                    continue
+                ov = find_overlap(merged[i], merged[j], min_overlap, 50, max_mismatch)
+                if ov >= min_overlap:
+                    new_contig = merged[i] + merged[j][ov:]
+                    merged[i] = new_contig
+                    merge_map[i].extend(merge_map.pop(j, []))
+                    merged[j] = ''
+                    changed = True
+                    break
+                ov = find_overlap(merged[j], merged[i], min_overlap, 50, max_mismatch)
+                if ov >= min_overlap:
+                    new_contig = merged[j] + merged[i][ov:]
+                    merged[j] = new_contig
+                    merge_map[j].extend(merge_map.pop(i, []))
+                    merged[i] = ''
+                    changed = True
+                    break
+            if changed:
+                break
+        merged = [c for c in merged if c]
+    final_merge_map = {}
+    new_idx = 0
+    for old_idx in range(len(contigs)):
+        for m_idx, m_list in merge_map.items():
+            if old_idx in m_list:
+                if m_idx not in final_merge_map:
+                    final_merge_map[m_idx] = []
+                final_merge_map[m_idx].append(old_idx + 1)
+                break
+    return merged, final_merge_map
+
+# ---------- Guided Assembly ----------
 def guided_assemble_fastq(r1_fastq, r2_fastq, ref_fasta, results_folder):
     sample = os.path.basename(r1_fastq).replace('_R1.fastq', '')
     sam_file = os.path.join(results_folder, f"{sample}.sam")
     bam_file = os.path.join(results_folder, f"{sample}.bam")
     sorted_bam = os.path.join(results_folder, f"{sample}.sorted.bam")
-    
     with open(sam_file, 'w') as out:
         subprocess.run(['bwa', 'mem', '-M', '-R', f'@RG\\tID:{sample}\\tSM:{sample}', ref_fasta, r1_fastq, r2_fastq],
                        stdout=out, stderr=subprocess.PIPE, check=True)
@@ -326,18 +367,13 @@ def guided_assemble_fastq(r1_fastq, r2_fastq, ref_fasta, results_folder):
         subprocess.run(['samtools', 'view', '-bS', sam_file], stdout=out, check=True)
     subprocess.run(['samtools', 'sort', '-o', sorted_bam, bam_file], check=True)
     subprocess.run(['samtools', 'index', sorted_bam], check=True)
-    
-    # Consensus
     consensus_file = os.path.join(results_folder, f"{sample}_consensus.fa")
     with open(consensus_file, 'w') as out:
         p1 = subprocess.run(['samtools', 'mpileup', '-uf', ref_fasta, sorted_bam], capture_output=True, check=True)
         p2 = subprocess.run(['bcftools', 'call', '-c'], input=p1.stdout, capture_output=True, check=True)
         p3 = subprocess.run(['bcftools', 'consensus', '-f', ref_fasta], input=p2.stdout, stdout=out, check=True)
-    
     with open(consensus_file) as f:
         contig = f.read().strip()
-    
-    # Coverage
     avg_depth, cov_20x = 0, 0
     try:
         depth_out = subprocess.run(['samtools', 'depth', sorted_bam], capture_output=True, text=True)
@@ -347,24 +383,17 @@ def guided_assemble_fastq(r1_fastq, r2_fastq, ref_fasta, results_folder):
             cov_20x = sum(1 for d in depths if d >= 20) / len(depths) * 100
     except:
         pass
-    
     return {
         'contig': contig, 'variants': [], 'avg_depth': avg_depth,
         'coverage_20x': cov_20x,
         'placements': [{'seq': contig, 'start': 0, 'end': len(contig)-1, 'mismatches': set()}]
     }
 
-# ---------- Master assembly function ----------
+# ---------- Master Assembly Function ----------
 def assemble_reads_from_files(filepaths, mode='greedy', min_overlap=3, max_mismatch=3, k=3,
                               orientation='auto', ref_fasta=None, results_folder=None,
                               trim_low_quality=False, quality_threshold=20, window_size=5):
-    """
-    Main assembly function.
-    If ref_fasta provided → guided assembly.
-    Else → de novo with chosen algorithm.
-    """
     if ref_fasta:
-        # Write all reads to a single FASTQ pair for guided assembly
         reads = parse_uploaded_files(filepaths, trim_low_quality, quality_threshold, window_size)
         r1_path = os.path.join(results_folder, 'combined_R1.fastq')
         r2_path = os.path.join(results_folder, 'combined_R2.fastq')
@@ -374,19 +403,72 @@ def assemble_reads_from_files(filepaths, mode='greedy', min_overlap=3, max_misma
                 f1.write(f"@read{i}\n{seq}\n+\n{qual}\n")
                 f2.write(f"@read{i}_R2\n\n+\n\n")
         return guided_assemble_fastq(r1_path, r2_path, ref_fasta, results_folder)
-    
-    # De novo assembly
+
     reads = parse_uploaded_files(filepaths, trim_low_quality, quality_threshold, window_size)
-    if mode == 'greedy':
-        res = greedy_assemble(reads, min_overlap, 50, max_mismatch, orientation)
-    elif mode == 'alignment':
-        contig = assemble_with_alignment(reads, min_overlap, orientation)
-        res = {'contig': contig, 'steps': [], 'placements': [], 'remaining': [], 'total': len(reads)}
-    elif mode == 'debruijn':
-        contig = debruijn_assemble(reads, k)
-        res = {'contig': contig, 'k': k, 'reads_count': len(reads)}
+    clusters = cluster_reads(reads, min_overlap, max_mismatch)
+
+    if len(clusters) > 1:
+        # Multiple clusters – assemble each, then try to merge
+        contigs = []
+        cluster_read_indices = []
+        for indices in clusters:
+            cluster_reads = [reads[i] for i in indices]
+            if mode == 'greedy':
+                assembly = greedy_assemble(cluster_reads, min_overlap, 50, max_mismatch, orientation)
+                contig = assembly['contig']
+            elif mode == 'alignment':
+                contig = assemble_with_alignment(cluster_reads, min_overlap, orientation)
+            elif mode == 'debruijn':
+                contig = debruijn_assemble(cluster_reads, k)
+            else:
+                contig = ''
+            if contig:
+                contigs.append(contig)
+                cluster_read_indices.append(indices)
+
+        merged_contigs, merge_map = merge_clusters(contigs, min_overlap=min_overlap*2, max_mismatch=max_mismatch)
+
+        all_contigs = []
+        for i, contig in enumerate(merged_contigs):
+            contributing = merge_map.get(i, [i+1])
+            all_reads_used = []
+            for cluster_id in contributing:
+                orig_idx = cluster_id - 1
+                if orig_idx < len(cluster_read_indices):
+                    all_reads_used.extend(cluster_read_indices[orig_idx])
+            all_contigs.append({
+                'cluster_id': i + 1,
+                'contig': contig,
+                'reads_used': len(all_reads_used),
+                'read_names': [f"read_{r+1}" for r in sorted(set(all_reads_used))],
+                'length': len(contig),
+                'merged_from': contributing if len(contributing) > 1 else None
+            })
+
+        return {
+            'contig': all_contigs[0]['contig'] if all_contigs else '',
+            'all_contigs': all_contigs,
+            'total_clusters': len(all_contigs),
+            'initial_clusters': len(clusters),
+            'reads_count': len(reads),
+            'mode': mode,
+            'multi_cluster': True
+        }
     else:
-        res = {'error': 'Unknown mode'}
-    res['reads_count'] = len(reads)
-    res['trimmed'] = trim_low_quality
-    return res
+        if mode == 'greedy':
+            res = greedy_assemble(reads, min_overlap, 50, max_mismatch, orientation)
+        elif mode == 'alignment':
+            contig = assemble_with_alignment(reads, min_overlap, orientation)
+            res = {'contig': contig, 'steps': [], 'placements': [], 'remaining': [], 'total': len(reads)}
+        elif mode == 'debruijn':
+            contig = debruijn_assemble(reads, k)
+            res = {'contig': contig, 'k': k, 'reads_count': len(reads)}
+        else:
+            res = {'error': 'Unknown mode'}
+        res['reads_count'] = len(reads)
+        res['multi_cluster'] = False
+        res['all_contigs'] = [{'cluster_id': 1, 'contig': res['contig'], 'reads_used': len(reads),
+                                'read_names': [f"read_{i+1}" for i in range(len(reads))],
+                                'length': len(res['contig']), 'merged_from': None}]
+        res['total_clusters'] = 1
+        return res
