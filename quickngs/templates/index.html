@@ -342,18 +342,26 @@ function buildSangerForm(files) {
     }
 }
 
+// ---------- Form submission handling (FIXED NGS file naming) ----------
 document.getElementById('smartForm').addEventListener('submit', function(e) {
     e.preventDefault();
     if (!detectedMode) return;
     
     const formData = new FormData(this);
     const seqFiles = document.getElementById('seqFiles').files;
-    for (let f of seqFiles) formData.append('seq_files', f);
     const refFile = document.getElementById('refFile').files[0];
     if (refFile) formData.append('ref_file', refFile);
     
-    let endpoint = '/start';
-    if (detectedMode === 'sanger') {
+    let endpoint = '/start';   // default for legacy? Not used
+    
+    if (detectedMode === 'ngs') {
+        // NGS: send the two files with exact names expected by /start_ngs
+        formData.append('fastq_r1', seqFiles[0]);
+        formData.append('fastq_r2', seqFiles[1]);
+        endpoint = '/start_ngs';
+    } else if (detectedMode === 'sanger') {
+        // Sanger: send all files under seq_files
+        for (let f of seqFiles) formData.append('seq_files', f);
         if (refFile) endpoint = '/assemble_guided';
         else endpoint = '/sanger_assemble';
     }
