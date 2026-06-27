@@ -1,13 +1,54 @@
-
+/* static/style.css */
 body {
     background-color: #f4f6f9;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
+
 .card {
     border-radius: 14px;
-    margin-bottom: 10px;
+    transition: box-shadow 0.2s ease;
 }
+
+.card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
 .progress-bar {
     font-weight: bold;
     transition: width 0.5s ease;
 }
+
+/* Collapse header cursor */
+.card-header[data-bs-toggle="collapse"] {
+    cursor: pointer;
+    user-select: none;
+}
+.card-header[data-bs-toggle="collapse"]:hover {
+    background-color: #e9ecef !important;
+}
+
+/* FAB animation */
+.btn-lg.rounded-circle {
+    transition: transform 0.2s;
+}
+.btn-lg.rounded-circle:active {
+    transform: scale(0.9);
+}
+
+/* Make file inputs touch-friendly */
+input[type="file"] {
+    min-height: 38px;
+}
+
+/* Desktop refinements */
+@media (min-width: 768px) {
+    .card {
+        border-radius: 16px;
+    }
+    .card-header {
+        border-radius: 16px 16px 0 0 !important;
+    }
+}
+
+/* Print styles (imported) */
+@import url('print.css');
