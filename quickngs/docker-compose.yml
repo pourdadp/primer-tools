@@ -1,0 +1,15 @@
+# quickngs/docker-compose.yml
+version: "3.8"
+
+services:
+  quickngs:
+    build: .
+    ports:
+      - "5002:5002"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./results:/app/results
+      - ./quickngs_cache:/app/quickngs_cache
+    environment:
+      - FLASK_ENV=production
+    restart: unless-stopped
