@@ -362,18 +362,31 @@ def sanger_assemble():
     files = request.files.getlist('seq_files')
     if not files:
         return jsonify({"status": "error", "message": "No sequence files uploaded."}), 400
+    
     algorithm = request.form.get('algorithm', 'greedy')
     project_name = request.form.get('project_name', 'Sanger_Project')
+    trim_quality = request.form.get('trim_quality') == 'on'
+    quality_threshold = int(request.form.get('quality_threshold', 20))
+    window_size = int(request.form.get('window_size', 5))
+    
     run_id = f"{project_name}_{int(time.time())}"
     results_dir = os.path.join(RESULTS_FOLDER, run_id)
     os.makedirs(results_dir, exist_ok=True)
+    
     filepaths = []
     for file in files:
         fpath = os.path.join(results_dir, secure_filename(file.filename))
         file.save(fpath)
         filepaths.append(fpath)
+    
     from assembly import assemble_reads_from_files
-    result = assemble_reads_from_files(filepaths, mode=algorithm, orientation='auto', results_folder=results_dir)
+    result = assemble_reads_from_files(
+        filepaths, mode=algorithm, orientation='auto',
+        results_folder=results_dir,
+        trim_low_quality=trim_quality,
+        quality_threshold=quality_threshold,
+        window_size=window_size
+    )
     return render_template('assemble_result.html', result=result, filename=files[0].filename)
 
 @app.route('/assemble_guided', methods=['POST'])
@@ -382,19 +395,32 @@ def assemble_guided():
     ref_file = request.files.get('ref_file')
     if not files or not ref_file:
         return jsonify({"status": "error", "message": "Both sequence and reference files required."}), 400
+    
     project_name = request.form.get('project_name', 'Guided_Project')
+    trim_quality = request.form.get('trim_quality') == 'on'
+    quality_threshold = int(request.form.get('quality_threshold', 20))
+    window_size = int(request.form.get('window_size', 5))
+    
     run_id = f"{project_name}_{int(time.time())}"
     results_dir = os.path.join(RESULTS_FOLDER, run_id)
     os.makedirs(results_dir, exist_ok=True)
+    
     ref_path = os.path.join(results_dir, secure_filename(ref_file.filename))
     ref_file.save(ref_path)
+    
     filepaths = []
     for file in files:
         fpath = os.path.join(results_dir, secure_filename(file.filename))
         file.save(fpath)
         filepaths.append(fpath)
+    
     from assembly import assemble_reads_from_files
-    result = assemble_reads_from_files(filepaths, ref_fasta=ref_path, results_folder=results_dir)
+    result = assemble_reads_from_files(
+        filepaths, ref_fasta=ref_path, results_folder=results_dir,
+        trim_low_quality=trim_quality,
+        quality_threshold=quality_threshold,
+        window_size=window_size
+    )
     return render_template('assemble_result.html', result=result, filename=files[0].filename)
 
 # ---------- Standard Routes ----------
