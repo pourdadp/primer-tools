@@ -10,6 +10,10 @@ services:
       - ./uploads:/app/uploads
       - ./results:/app/results
       - ./quickngs_cache:/app/quickngs_cache
+      - snpeff_data:/data/snpeff
     environment:
       - FLASK_ENV=production
     restart: unless-stopped
+
+volumes:
+  snpeff_data:   # named volume for SnpEff database
