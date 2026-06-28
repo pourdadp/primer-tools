@@ -7,13 +7,24 @@
         <h4 class="fw-bold">🧬 Assembly Result</h4>
         <p class="text-muted small">
             Mode: {{ result.mode }} | Total reads: {{ result.reads_count }}
-            {% if result.multi_cluster %}
-                | Initial clusters: {{ result.initial_clusters }} | Final contigs: {{ result.total_clusters }}
-            {% endif %}
             {% if result.trimmed %} | ✂️ Quality trimmed{% endif %}
         </p>
 
         {% if result.all_contigs %}
+            <!-- اگر چند کلاستر اولیه وجود داشته باشد، هشدار نمایش بده -->
+            {% if result.initial_clusters and result.initial_clusters > 1 %}
+            <div class="alert alert-info py-2 px-3 small">
+                <strong>🔍 Why multiple contigs?</strong><br>
+                The uploaded reads formed <strong>{{ result.initial_clusters }} separate groups (clusters)</strong> 
+                because they did not have enough overlap with each other. Assembly was run on each group independently. 
+                {% if result.total_clusters < result.initial_clusters %}
+                    After merging overlapping contigs, the final number of contigs is <strong>{{ result.total_clusters }}</strong>.
+                {% else %}
+                    No further merging was possible, so each group became one contig.
+                {% endif %}
+            </div>
+            {% endif %}
+
             {% for contig_data in result.all_contigs %}
             <div class="card mb-3 shadow-sm">
                 <div class="card-header bg-success text-white py-2">
@@ -26,7 +37,6 @@
                 <div class="card-body bg-light py-2 px-3">
                     <!-- Graphical Bar -->
                     <canvas id="graph_{{ contig_data.cluster_id }}" width="800" height="60" style="width:100%; max-height:60px;"></canvas>
-                    
                     <!-- Sequence -->
                     <pre style="font-family: monospace; white-space: pre-wrap; word-break: break-all; max-height: 150px; overflow-y: auto; margin-top: 8px;">{{ contig_data.contig }}</pre>
                 </div>
@@ -62,38 +72,32 @@ allContigs.forEach(contig => {
     const x = 10, barHeight = 30, y = 15;
     const maxWidth = width - 20;
     
-    // Draw background bar (total length)
+    // Draw background bar
     ctx.fillStyle = '#e9ecef';
     ctx.fillRect(x, y, maxWidth, barHeight);
     
-    // If merged, draw segments with different colors
     if (contig.merged_from && contig.merged_from.length > 1) {
         const colors = ['#198754', '#0d6efd', '#6f42c1', '#fd7e14', '#d63384'];
         const segmentWidth = maxWidth / contig.merged_from.length;
         contig.merged_from.forEach((clusterId, i) => {
             ctx.fillStyle = colors[i % colors.length];
             ctx.fillRect(x + i * segmentWidth, y, segmentWidth, barHeight);
-            // Label
             ctx.fillStyle = 'white';
             ctx.font = '10px sans-serif';
             ctx.fillText('C' + clusterId, x + i * segmentWidth + 5, y + barHeight - 8);
         });
     } else {
-        // Single cluster: show coverage intensity based on read count
-        const intensity = Math.min(contig.reads_used / 10, 1); // max at 10 reads
+        const intensity = Math.min(contig.reads_used / 10, 1);
         const r = Math.floor(25 + (1 - intensity) * 200);
         const g = Math.floor(135 - (1 - intensity) * 100);
         const b = Math.floor(84 - (1 - intensity) * 50);
         ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
         ctx.fillRect(x, y, maxWidth, barHeight);
-        
-        // Label
         ctx.fillStyle = 'white';
         ctx.font = '10px sans-serif';
         ctx.fillText(contig.length + ' bp (' + contig.reads_used + ' reads)', x + 10, y + barHeight - 8);
     }
     
-    // Draw border
     ctx.strokeStyle = '#495057';
     ctx.lineWidth = 1;
     ctx.strokeRect(x, y, maxWidth, barHeight);
