@@ -2,6 +2,7 @@
 """
 QuickNGS – From FASTQ/AB1 to clinical report or assembled contig.
 Real NGS pipeline (BWA + Samtools + FreeBayes + SnpEff) + De Novo / Guided Assembly.
+Includes Translation (5 methods, 6 genetic codes) and BLAST (NCBI Web + Local).
 Powered by Pourdad Panahi – Built with DeepSeek AI
 """
 
@@ -266,6 +267,7 @@ def run_pipeline(config_path, results_folder):
             config = yaml.safe_load(f)
         sample_name = config.get('sample_name', 'Unknown Sample')
         ref_name = config.get('reference', 'custom')
+        ref_fasta = config.get('ref_fasta') or get_reference_genome(ref_name, results_folder)
         min_quality = config.get('min_quality', 20)
         min_depth = config.get('min_depth', 10)
         do_trim = config.get('trim_adapters', True)
@@ -284,9 +286,6 @@ def run_pipeline(config_path, results_folder):
             if not is_tool_available(tool):
                 update_status(results_folder, "Error", 0, f"{msg} not installed.")
                 return
-
-        update_status(results_folder, "Preparing Reference", 8, f"Setting up {ref_name}...")
-        ref_fasta = get_reference_genome(ref_name, results_folder)
 
         fastqc_dir = os.path.join(results_folder, "fastqc")
         os.makedirs(fastqc_dir, exist_ok=True)
@@ -367,13 +366,11 @@ def sanger_assemble():
     quality_threshold = int(request.form.get('quality_threshold', 20))
     window_size = int(request.form.get('window_size', 5))
 
-    # محاسبهٔ orientation بر اساس direction انتخاب‌شده برای هر خوانش
     directions = []
     for i in range(len(files)):
         dir_key = f'direction_{i}'
         directions.append(request.form.get(dir_key, 'auto'))
 
-    # تعیین orientation کلی
     if all(d == 'forward' for d in directions):
         orientation = 'forward'
     elif all(d == 'reverse' for d in directions):
@@ -408,21 +405,16 @@ def assemble_guided():
     if not files or not ref_file:
         return jsonify({"status": "error", "message": "Both sequence and reference files required."}), 400
 
-    # بررسی وجود bcftools (علاوه بر ابزارهای دیگر که در guided_assemble_fastq چک می‌شود)
-    if not is_tool_available('bcftools'):
-        return jsonify({"status": "error", "message": "bcftools is not installed. Please install it (sudo apt install bcftools)."}), 500
-
     project_name = request.form.get('project_name', 'Guided_Project')
     trim_quality = request.form.get('trim_quality') == 'on'
     quality_threshold = int(request.form.get('quality_threshold', 20))
     window_size = int(request.form.get('window_size', 5))
 
-    # orientation برای guided هم می‌تواند استفاده شود (اگرچه فعلاً تأثیری ندارد)
     directions = []
     for i in range(len(files)):
         dir_key = f'direction_{i}'
         directions.append(request.form.get(dir_key, 'auto'))
-    orientation = 'auto'  # guided از orientation استفاده نمی‌کند
+    orientation = 'auto'
 
     run_id = f"{project_name}_{int(time.time())}"
     results_dir = os.path.join(RESULTS_FOLDER, run_id)
@@ -458,14 +450,32 @@ def start_ngs():
     r2 = request.files.get('fastq_r2')
     if not r1 or not r2:
         return jsonify({"status": "error", "message": "Both FASTQ files required."}), 400
+
     run_id = f"{sample_name}_{int(time.time())}"
     results_dir = os.path.join(RESULTS_FOLDER, run_id)
     os.makedirs(results_dir, exist_ok=True)
+
     r1.save(os.path.join(results_dir, secure_filename(r1.filename)))
     r2.save(os.path.join(results_dir, secure_filename(r2.filename)))
+
+    ref_name = request.form.get('reference', 'hg38')
+    if ref_name == 'custom':
+        custom_ref = request.files.get('custom_reference')
+        if custom_ref:
+            ref_path = os.path.join(results_dir, secure_filename(custom_ref.filename))
+            custom_ref.save(ref_path)
+            ref_fasta = ref_path
+            if not os.path.exists(ref_fasta + ".bwt"):
+                subprocess.run(["bwa", "index", ref_fasta], capture_output=True, check=False)
+        else:
+            ref_fasta = get_reference_genome('custom', results_dir)
+    else:
+        ref_fasta = get_reference_genome(ref_name, results_dir)
+
     config = {
         'sample_name': sample_name,
-        'reference': request.form.get('reference', 'hg38'),
+        'reference': ref_name,
+        'ref_fasta': ref_fasta,
         'min_quality': int(request.form.get('min_quality', 20)),
         'min_depth': int(request.form.get('min_depth', 10)),
         'trim_adapters': request.form.get('trim_adapters') == 'on',
@@ -528,6 +538,40 @@ def delete_run(run_id):
         except OSError as e:
             return jsonify({"status": "error", "message": str(e)}), 500
     return jsonify({"status": "error", "message": "Run not found."}), 404
+
+# ---------- Translation endpoint ----------
+@app.route('/translate', methods=['POST'])
+def translate_sequence():
+    data = request.get_json()
+    seq = data.get('sequence', '')
+    method = data.get('method', 'auto')
+    genetic_code = int(data.get('genetic_code', 1))
+    ref_protein = data.get('ref_protein', None)
+    
+    if not seq:
+        return jsonify({"status": "error", "message": "No sequence provided."}), 400
+    
+    from translation import translate_contig
+    result = translate_contig(seq, ref_protein, method, genetic_code)
+    return jsonify(result)
+
+# ---------- BLAST endpoint ----------
+@app.route('/blast', methods=['POST'])
+def blast_sequence():
+    data = request.get_json()
+    seq = data.get('sequence', '')
+    mode = data.get('mode', 'web')
+    db = data.get('db', 'nt')
+    program = data.get('program', 'blastn')
+    evalue = float(data.get('evalue', 0.001))
+    max_hits = int(data.get('max_hits', 50))
+    
+    if not seq:
+        return jsonify({"status": "error", "message": "No sequence provided."}), 400
+    
+    from blast import run_blast
+    result = run_blast(seq, mode, db, program, evalue, max_hits)
+    return jsonify(result)
 
 # ---------- Info Pages ----------
 @app.route('/about')
