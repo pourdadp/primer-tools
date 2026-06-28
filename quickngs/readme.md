@@ -69,6 +69,7 @@ Option 2: Docker
 
 ```bash
 docker-compose up -d
+
 # Open http://localhost:5002
 ```
 
@@ -119,3 +120,17 @@ BCFtools Consensus calling
 Biopython AB1/FASTA parsing, translation
 
 ---
+👨‍🔬 Author
+
+Pourdad Panahi – Biotechnologist & Computational Biologist
+18+ years wet‑lab experience (cell culture, real‑time PCR, virus cultivation, ELISA)
+Building digital tools for the life sciences.
+
+· GitHub: github.com/pourdadp
+· Portfolio: pourdadp.github.io
+
+---
+
+📄 License
+
+MIT License – see LICENSE file
