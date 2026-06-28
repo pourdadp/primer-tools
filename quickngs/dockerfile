@@ -9,21 +9,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fastqc \
     trimmomatic \
     freebayes \
+    bcftools \
     snpeff \
     && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
+# Set SnpEff data directory (will be mounted as volume)
+ENV SNPEFF_DATA=/data/snpeff
+
 WORKDIR /app
 
-# Copy requirements first (better caching)
+# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application
+# Copy application code
 COPY . .
 
-# Create necessary folders
-RUN mkdir -p uploads results
+# Create folders that will be used as volumes (they can be mounted over)
+RUN mkdir -p uploads results quickngs_cache /data/snpeff
 
 EXPOSE 5002
 
