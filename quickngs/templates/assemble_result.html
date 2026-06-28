@@ -37,8 +37,108 @@
                 <div class="card-body bg-light py-2 px-3">
                     <!-- Graphical Bar -->
                     <canvas id="graph_{{ contig_data.cluster_id }}" width="800" height="60" style="width:100%; max-height:60px;"></canvas>
+                    
                     <!-- Sequence -->
                     <pre style="font-family: monospace; white-space: pre-wrap; word-break: break-all; max-height: 150px; overflow-y: auto; margin-top: 8px;">{{ contig_data.contig }}</pre>
+                    
+                    <!-- Action Buttons -->
+                    <div class="d-flex gap-2 mt-2 flex-wrap">
+                        <!-- Translate Button -->
+                        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" 
+                                data-bs-target="#translate_{{ contig_data.cluster_id }}">
+                            🧬 Translate
+                        </button>
+                        
+                        <!-- BLAST Button -->
+                        <button class="btn btn-sm btn-outline-info" data-bs-toggle="collapse" 
+                                data-bs-target="#blast_{{ contig_data.cluster_id }}">
+                            🔍 BLAST
+                        </button>
+                        
+                        <!-- Copy Button -->
+                        <button class="btn btn-sm btn-outline-primary" onclick="copySingleContig('{{ contig_data.contig }}')">
+                            📋 Copy
+                        </button>
+                    </div>
+                    
+                    <!-- Translation Section -->
+                    <div class="collapse mt-2" id="translate_{{ contig_data.cluster_id }}">
+                        <div class="card bg-light">
+                            <div class="card-body py-2 px-2">
+                                <div class="row g-1 align-items-end">
+                                    <div class="col-auto">
+                                        <label class="form-label small mb-0">Genetic Code</label>
+                                        <select class="form-select form-select-sm" id="gencode_{{ contig_data.cluster_id }}">
+                                            <option value="1">Standard (1)</option>
+                                            <option value="4">Mycoplasma (4)</option>
+                                            <option value="11">Bacteria/Archaea (11)</option>
+                                            <option value="3">Yeast Mitochondrial (3)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-auto">
+                                        <label class="form-label small mb-0">Method</label>
+                                        <select class="form-select form-select-sm" id="method_{{ contig_data.cluster_id }}" onchange="toggleManualFrame(this, {{ contig_data.cluster_id }})">
+                                            <option value="auto">Auto-detect</option>
+                                            <option value="longest_orf">Longest ORF</option>
+                                            <option value="first_atg">First ATG</option>
+                                            <option value="stop_codon">Stop Codon</option>
+                                            <option value="codon_usage">Codon Usage (CAI)</option>
+                                            <option value="manual">Manual Frame</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-auto" id="manual_frame_div_{{ contig_data.cluster_id }}" style="display:none;">
+                                        <label class="form-label small mb-0">Frame</label>
+                                        <select class="form-select form-select-sm" id="frame_{{ contig_data.cluster_id }}">
+                                            <option value="1">+1</option><option value="2">+2</option><option value="3">+3</option>
+                                            <option value="-1">-1</option><option value="-2">-2</option><option value="-3">-3</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-auto">
+                                        <button class="btn btn-sm btn-primary" onclick="translateContig({{ contig_data.cluster_id }})">Apply</button>
+                                    </div>
+                                </div>
+                                <div id="translation_result_{{ contig_data.cluster_id }}" class="mt-2"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- BLAST Section -->
+                    <div class="collapse mt-2" id="blast_{{ contig_data.cluster_id }}">
+                        <div class="card bg-light">
+                            <div class="card-body py-2 px-2">
+                                <div class="row g-1 align-items-end">
+                                    <div class="col-auto">
+                                        <label class="form-label small mb-0">Database</label>
+                                        <select class="form-select form-select-sm" id="blast_db_{{ contig_data.cluster_id }}">
+                                            <option value="nt">Nucleotide (nt)</option>
+                                            <option value="nr">Protein (nr)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-auto">
+                                        <label class="form-label small mb-0">Program</label>
+                                        <select class="form-select form-select-sm" id="blast_program_{{ contig_data.cluster_id }}">
+                                            <option value="blastn">blastn (DNA)</option>
+                                            <option value="blastx">blastx (translated)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-auto">
+                                        <label class="form-label small mb-0">Max Hits</label>
+                                        <select class="form-select form-select-sm" id="blast_max_{{ contig_data.cluster_id }}">
+                                            <option value="10">10</option>
+                                            <option value="50" selected>50</option>
+                                            <option value="100">100</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-auto">
+                                        <button class="btn btn-sm btn-info" onclick="runBlast({{ contig_data.cluster_id }})">
+                                            Run BLAST
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="blast_result_{{ contig_data.cluster_id }}" class="mt-2"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-footer py-1 px-3">
                     <small class="text-muted">Reads used: {{ contig_data.read_names|join(', ') }}</small>
@@ -60,7 +160,7 @@
 <script>
 const allContigs = {{ result.all_contigs|tojson }};
 
-// Draw graphical bar for each contig
+// ========== GRAPH DRAWING ==========
 allContigs.forEach(contig => {
     const canvas = document.getElementById('graph_' + contig.cluster_id);
     if (!canvas) return;
@@ -103,6 +203,11 @@ allContigs.forEach(contig => {
     ctx.strokeRect(x, y, maxWidth, barHeight);
 });
 
+// ========== COPY / SAVE ==========
+function copySingleContig(seq) {
+    navigator.clipboard.writeText(seq).then(() => alert('Contig copied!'));
+}
+
 function copyAllContigs() {
     let text = allContigs.map(c => `>contig_${c.cluster_id} (${c.length} bp, ${c.reads_used} reads)\n${c.contig}`).join('\n\n');
     navigator.clipboard.writeText(text).then(() => alert('All contigs copied!'));
@@ -115,6 +220,107 @@ function saveAllContigs() {
     a.href = URL.createObjectURL(blob);
     a.download = 'all_contigs.fasta';
     a.click();
+}
+
+// ========== TRANSLATION ==========
+function toggleManualFrame(select, clusterId) {
+    const manualDiv = document.getElementById('manual_frame_div_' + clusterId);
+    manualDiv.style.display = select.value === 'manual' ? 'block' : 'none';
+}
+
+function translateContig(clusterId) {
+    const contig = allContigs.find(c => c.cluster_id == clusterId);
+    if (!contig) return;
+    
+    const geneticCode = document.getElementById('gencode_' + clusterId).value;
+    const methodSelect = document.getElementById('method_' + clusterId);
+    const method = methodSelect.value;
+    const frameValue = method === 'manual' ? document.getElementById('frame_' + clusterId).value : 'auto';
+    
+    const resultDiv = document.getElementById('translation_result_' + clusterId);
+    resultDiv.innerHTML = '<div class="text-center"><span class="spinner-border spinner-border-sm"></span> Translating...</div>';
+    
+    fetch('/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            sequence: contig.contig,
+            method: method === 'manual' ? parseInt(frameValue) : method,
+            genetic_code: parseInt(geneticCode)
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        const alertClass = data.color === 'success' ? 'alert-success' : 
+                          data.color === 'warning' ? 'alert-warning' : 'alert-info';
+        
+        let html = `<div class="alert ${alertClass} py-2 px-3 small mb-1">`;
+        html += `<strong>${data.method_description}</strong>`;
+        if (data.warning) html += `<br><small>⚠️ ${data.warning}</small>`;
+        html += `</div>`;
+        html += `<pre style="font-family: monospace; white-space: pre-wrap; word-break: break-all; background: white; padding: 8px; border-radius: 4px;">${data.protein}</pre>`;
+        html += `<small class="text-muted">${data.protein.length} amino acids | Frame ${data.frame:+d}</small>`;
+        
+        resultDiv.innerHTML = html;
+    })
+    .catch(err => {
+        resultDiv.innerHTML = '<div class="alert alert-danger py-1 px-2 small">Translation failed.</div>';
+    });
+}
+
+// ========== BLAST ==========
+function runBlast(clusterId) {
+    const contig = allContigs.find(c => c.cluster_id == clusterId);
+    if (!contig) return;
+    
+    const db = document.getElementById('blast_db_' + clusterId).value;
+    const program = document.getElementById('blast_program_' + clusterId).value;
+    const maxHits = document.getElementById('blast_max_' + clusterId).value;
+    
+    const resultDiv = document.getElementById('blast_result_' + clusterId);
+    resultDiv.innerHTML = '<div class="text-center"><span class="spinner-border spinner-border-sm"></span> Running BLAST... (may take 30-60 seconds)</div>';
+    
+    fetch('/blast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            sequence: contig.contig,
+            mode: 'web',
+            db: db,
+            program: program,
+            max_hits: parseInt(maxHits)
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            resultDiv.innerHTML = `<div class="alert alert-danger py-1 px-2 small">${data.error}</div>`;
+            return;
+        }
+        
+        if (!data.length) {
+            resultDiv.innerHTML = '<div class="alert alert-warning py-1 px-2 small">No hits found.</div>';
+            return;
+        }
+        
+        let html = '<div class="table-responsive"><table class="table table-sm table-striped small mb-0">';
+        html += '<thead><tr><th>#</th><th>Description</th><th>Score</th><th>E-value</th><th>Identity</th><th>Link</th></tr></thead><tbody>';
+        data.forEach((hit, i) => {
+            html += `<tr>
+                <td>${i+1}</td>
+                <td><small>${(hit.title || 'N/A').substring(0, 80)}...</small></td>
+                <td>${hit.score || '-'}</td>
+                <td>${hit.evalue ? hit.evalue.toExponential(1) : '-'}</td>
+                <td>${hit.identity || '-'}%</td>
+                <td>${hit.link ? `<a href="${hit.link}" target="_blank">NCBI</a>` : '-'}</td>
+            </tr>`;
+        });
+        html += '</tbody></table></div>';
+        resultDiv.innerHTML = html;
+    })
+    .catch(err => {
+        resultDiv.innerHTML = '<div class="alert alert-danger py-1 px-2 small">BLAST request failed.</div>';
+    });
 }
 </script>
 {% endblock %}
