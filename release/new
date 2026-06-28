@@ -1,3 +1,4 @@
+
 # QuickNGS v2.0 – Smart NGS & Sanger Analysis Suite
 
 ## 🆕 What's New
@@ -42,3 +43,42 @@ sudo apt install bwa samtools freebayes snpeff fastqc trimmomatic bcftools -y
 pip install -r requirements.txt
 python3 app.py
 # Open http://127.0.0.1:5002
+```
+
+Option 2: Docker
+
+```bash
+docker-compose up -d
+# Open http://localhost:5002
+```
+
+---
+
+👨‍🔬 Author
+
+Pourdad Panahi – Biotechnologist & Computational Biologist
+18+ years wet‑lab experience | Built with DeepSeek AI
+
+---
+
+📄 License
+
+MIT License – see LICENSE file
+
+```
+
+---
+
+## 
+---
+
+📄 License
+
+MIT License – see LICENSE file
+
+---
+
+<p align="center">
+  <b>Made with 🧬 by a scientist who codes — powered by DeepSeek AI</b>
+</p>
+```
