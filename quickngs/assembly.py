@@ -386,36 +386,61 @@ def merge_clusters(contigs, min_overlap=10, max_mismatch=0):
                 break
     return merged, final_merge_map
 
-# ---------- Guided Assembly (Single‑End, Auto‑Indexing) ----------
+# ---------- Guided Assembly (with reference validation) ----------
 def guided_assemble_fastq(r1_fastq, ref_fasta, results_folder):
     for tool in ['bwa', 'samtools', 'bcftools']:
         if not is_tool_available(tool):
             raise RuntimeError(f"{tool} is not installed.")
 
-    # Ensure reference is indexed
+    # Validate reference FASTA
+    if not os.path.exists(ref_fasta):
+        raise RuntimeError(f"Reference file not found: {ref_fasta}")
+    if os.path.getsize(ref_fasta) == 0:
+        raise RuntimeError("Reference file is empty.")
+    try:
+        ref_records = list(SeqIO.parse(ref_fasta, "fasta"))
+        if not ref_records:
+            raise RuntimeError("Reference file contains no sequences. Please upload a valid FASTA file.")
+    except Exception as e:
+        raise RuntimeError(f"Invalid reference FASTA file: {str(e)}")
+
+    # Index reference if not already indexed
     if not os.path.exists(ref_fasta + ".bwt"):
-        subprocess.run(["bwa", "index", ref_fasta], check=True, capture_output=True)
+        result = subprocess.run(["bwa", "index", ref_fasta], capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(f"Failed to index reference: {result.stderr.strip()}")
 
     sample = os.path.basename(r1_fastq).replace('_R1.fastq', '')
     sam_file = os.path.join(results_folder, f"{sample}.sam")
     bam_file = os.path.join(results_folder, f"{sample}.bam")
     sorted_bam = os.path.join(results_folder, f"{sample}.sorted.bam")
 
-    # Always single‑end
+    # Single‑end alignment
     with open(sam_file, 'w') as out:
-        subprocess.run(['bwa', 'mem', '-M', '-R', f'@RG\\tID:{sample}\\tSM:{sample}',
-                        ref_fasta, r1_fastq], stdout=out, stderr=subprocess.PIPE, check=True)
+        result = subprocess.run(['bwa', 'mem', '-M', '-R', f'@RG\\tID:{sample}\\tSM:{sample}',
+                                ref_fasta, r1_fastq], stdout=out, stderr=subprocess.PIPE, check=False)
+        if result.returncode != 0:
+            raise RuntimeError(f"BWA alignment failed: {result.stderr.decode()}")
 
+    # Convert to BAM and sort
     with open(bam_file, 'w') as out:
         subprocess.run(['samtools', 'view', '-bS', sam_file], stdout=out, check=True)
     subprocess.run(['samtools', 'sort', '-o', sorted_bam, bam_file], check=True)
     subprocess.run(['samtools', 'index', sorted_bam], check=True)
 
+    # Generate consensus
     consensus_file = os.path.join(results_folder, f"{sample}_consensus.fa")
     with open(consensus_file, 'w') as out:
-        p1 = subprocess.run(['samtools', 'mpileup', '-uf', ref_fasta, sorted_bam], capture_output=True, check=True)
-        p2 = subprocess.run(['bcftools', 'call', '-c'], input=p1.stdout, capture_output=True, check=True)
-        p3 = subprocess.run(['bcftools', 'consensus', '-f', ref_fasta], input=p2.stdout, stdout=out, check=True)
+        p1 = subprocess.run(['samtools', 'mpileup', '-uf', ref_fasta, sorted_bam],
+                            capture_output=True, text=True)
+        if p1.returncode != 0:
+            raise RuntimeError(f"samtools mpileup failed: {p1.stderr.strip()}")
+        p2 = subprocess.run(['bcftools', 'call', '-c'], input=p1.stdout, capture_output=True, text=True)
+        if p2.returncode != 0:
+            raise RuntimeError(f"bcftools call failed: {p2.stderr.strip()}")
+        p3 = subprocess.run(['bcftools', 'consensus', '-f', ref_fasta], input=p2.stdout, stdout=out, text=True)
+        if p3.returncode != 0:
+            raise RuntimeError(f"bcftools consensus failed: {p3.stderr.strip()}")
 
     with open(consensus_file) as f:
         contig = f.read().strip()
@@ -423,10 +448,11 @@ def guided_assemble_fastq(r1_fastq, ref_fasta, results_folder):
     avg_depth, cov_20x = 0, 0
     try:
         depth_out = subprocess.run(['samtools', 'depth', sorted_bam], capture_output=True, text=True)
-        depths = [int(l.split()[2]) for l in depth_out.stdout.strip().split('\n') if l]
-        if depths:
-            avg_depth = sum(depths) / len(depths)
-            cov_20x = sum(1 for d in depths if d >= 20) / len(depths) * 100
+        if depth_out.returncode == 0:
+            depths = [int(l.split()[2]) for l in depth_out.stdout.strip().split('\n') if l]
+            if depths:
+                avg_depth = sum(depths) / len(depths)
+                cov_20x = sum(1 for d in depths if d >= 20) / len(depths) * 100
     except:
         pass
 
@@ -449,7 +475,6 @@ def assemble_reads_from_files(filepaths, mode='greedy', min_overlap=3, max_misma
             for i, seq in enumerate(reads):
                 qual = ''.join(chr(40+33) for _ in seq)
                 f1.write(f"@read{i}\n{seq}\n+\n{qual}\n")
-        # No R2 – Sanger data is single‑end
         return guided_assemble_fastq(r1_path, ref_fasta, results_folder)
 
     reads, all_trim_info = parse_uploaded_files(filepaths, trim_low_quality, quality_threshold, window_size)
