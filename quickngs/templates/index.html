@@ -14,7 +14,6 @@
 
         <!-- Smart Upload Form -->
         <form id="smartForm" enctype="multipart/form-data">
-            <!-- File input for sequences (multiple allowed) -->
             <div class="card mb-2 shadow-sm border-0">
                 <div class="card-body py-2 px-3">
                     <label class="form-label small fw-bold mb-1">📂 Sequence Files *</label>
@@ -29,7 +28,6 @@
                 </div>
             </div>
 
-            <!-- Reference (optional) -->
             <div class="card mb-2 shadow-sm border-0">
                 <div class="card-body py-2 px-3">
                     <label class="form-label small fw-bold mb-1">🧬 Reference (optional)</label>
@@ -39,7 +37,6 @@
                 </div>
             </div>
 
-            <!-- Project Name -->
             <div class="card mb-2 shadow-sm border-0">
                 <div class="card-body py-2 px-3">
                     <label class="form-label small fw-bold mb-1">📝 Project Name (optional)</label>
@@ -48,10 +45,8 @@
                 </div>
             </div>
 
-            <!-- Dynamic Settings (hidden until files detected) -->
             <div id="dynamicSettings" style="display:none;"></div>
 
-            <!-- Start Button (disabled until files selected) -->
             <div class="text-center mb-4">
                 <button type="submit" id="startBtn" class="btn btn-primary btn-lg px-5 shadow" disabled>
                     🚀 Start Analysis
@@ -59,7 +54,6 @@
             </div>
         </form>
 
-        <!-- Progress (hidden) -->
         <div id="progress_section" style="display:none;">
             <div class="card mb-2 shadow-sm border-0">
                 <div class="card-body py-2 px-3">
@@ -118,16 +112,15 @@
 }
 </style>
 
-<!-- JavaScript for smart detection + tooltips -->
 <script>
 const seqInput = document.getElementById('seqFiles');
 const refInput = document.getElementById('refFile');
 const projectInput = document.getElementById('projectName');
 const dynamicDiv = document.getElementById('dynamicSettings');
 const startBtn = document.getElementById('startBtn');
-let detectedMode = null;  // 'ngs' or 'sanger'
+let detectedMode = null;
 
-// ---------- Tooltip logic ----------
+// Tooltip toggle
 document.addEventListener('click', function(e) {
     const icon = e.target.closest('.help-icon');
     if (icon) {
@@ -167,7 +160,6 @@ seqInput.addEventListener('change', function() {
         detectedMode = 'ngs';
         buildNGSForm(files);
     } else {
-        // Sanger mode – works with 1 or more files
         detectedMode = 'sanger';
         buildSangerForm(files);
     }
@@ -342,18 +334,16 @@ function buildSangerForm(files) {
     }
 }
 
-// ---------- Form submission handling ----------
 document.getElementById('smartForm').addEventListener('submit', function(e) {
     e.preventDefault();
     if (!detectedMode) return;
     
     const formData = new FormData(this);
     const seqFiles = document.getElementById('seqFiles').files;
-    for (let f of seqFiles) formData.append('seq_files', f);
     const refFile = document.getElementById('refFile').files[0];
     if (refFile) formData.append('ref_file', refFile);
     
-    let endpoint = '/start';   // unused default
+    let endpoint = '/start';
     if (detectedMode === 'ngs') {
         formData.append('fastq_r1', seqFiles[0]);
         formData.append('fastq_r2', seqFiles[1]);
