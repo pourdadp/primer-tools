@@ -2,7 +2,8 @@
 """
 QuickNGS – From FASTQ/AB1 to clinical report or assembled contig.
 Real NGS pipeline (BWA + Samtools + FreeBayes + SnpEff) + De Novo / Guided Assembly.
-Includes Translation (5 methods, 6 genetic codes), BLAST (NCBI Web + Local), and MSA (MUSCLE + Biopython).
+Includes Translation (5 methods, 6 genetic codes), BLAST (NCBI Web + Local), MSA (MUSCLE + Biopython),
+and PDF report generation.
 Powered by Pourdad Panahi – Built with DeepSeek AI
 """
 
@@ -14,7 +15,7 @@ import subprocess
 import yaml
 import shutil
 import sys
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, make_response
 from werkzeug.utils import secure_filename
 
 # ---------- Smart Storage Management ----------
@@ -396,7 +397,16 @@ def sanger_assemble():
         quality_threshold=quality_threshold,
         window_size=window_size
     )
-    return render_template('assemble_result.html', result=result, filename=files[0].filename)
+
+    # Save result for PDF
+    result_path = os.path.join(results_dir, 'result.json')
+    try:
+        with open(result_path, 'w') as f:
+            json.dump(result, f, default=str)
+    except:
+        pass
+
+    return render_template('assemble_result.html', result=result, filename=files[0].filename, run_id=run_id)
 
 @app.route('/assemble_guided', methods=['POST'])
 def assemble_guided():
@@ -436,7 +446,16 @@ def assemble_guided():
         quality_threshold=quality_threshold,
         window_size=window_size
     )
-    return render_template('assemble_result.html', result=result, filename=files[0].filename)
+
+    # Save result for PDF
+    result_path = os.path.join(results_dir, 'result.json')
+    try:
+        with open(result_path, 'w') as f:
+            json.dump(result, f, default=str)
+    except:
+        pass
+
+    return render_template('assemble_result.html', result=result, filename=files[0].filename, run_id=run_id)
 
 # ---------- Standard Routes ----------
 @app.route('/')
@@ -585,11 +604,9 @@ def msa_align():
     
     from msa import run_muscle, run_pairwise_alignment
     
-    # Try MUSCLE first, fallback to pairwise for 2 sequences
     result = run_muscle(sequences, labels)
     
     if 'error' in result and len(sequences) == 2:
-        # Fallback to Biopython's pairwise for 2 sequences
         result = run_pairwise_alignment(
             sequences[0], sequences[1],
             labels[0] if labels else 'seq_1',
@@ -597,6 +614,45 @@ def msa_align():
         )
     
     return jsonify(result)
+
+# ---------- PDF Report Route ----------
+@app.route('/report_pdf/<run_id>')
+def report_pdf(run_id):
+    try:
+        from weasyprint import HTML
+    except ImportError:
+        return "WeasyPrint is not installed. Please install it: pip install weasyprint", 500
+
+    run_dir = os.path.join(RESULTS_FOLDER, run_id)
+    if not os.path.isdir(run_dir):
+        return "Run not found.", 404
+
+    report_json = os.path.join(run_dir, 'report.json')
+    result_json = os.path.join(run_dir, 'result.json')
+    
+    if os.path.exists(report_json):
+        with open(report_json) as f:
+            report = json.load(f)
+        variants_file = os.path.join(run_dir, 'variants.json')
+        variants = []
+        if os.path.exists(variants_file):
+            with open(variants_file) as f:
+                variants = json.load(f)
+        rendered = render_template('report_pdf.html', mode='ngs', report=report, variants=variants, run_id=run_id)
+    elif os.path.exists(result_json):
+        with open(result_json) as f:
+            result = json.load(f)
+        rendered = render_template('report_pdf.html', mode='sanger', result=result, run_id=run_id)
+    else:
+        return "No result data found for this run.", 404
+
+    html = HTML(string=rendered)
+    pdf = html.write_pdf()
+    
+    response = make_response(pdf)
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename=QuickNGS_report_{run_id}.pdf'
+    return response
 
 # ---------- Info Pages ----------
 @app.route('/about')
