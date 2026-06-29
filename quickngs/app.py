@@ -3,7 +3,7 @@
 QuickNGS – From FASTQ/AB1 to clinical report or assembled contig.
 Real NGS pipeline (BWA + Samtools + FreeBayes + SnpEff) + De Novo / Guided Assembly.
 Includes Translation (5 methods, 6 genetic codes), BLAST (NCBI Web + Local), MSA (MUSCLE + Biopython),
-and PDF report generation.
+PDF report generation, and logging.
 Powered by Pourdad Panahi – Built with DeepSeek AI
 """
 
@@ -17,6 +17,10 @@ import shutil
 import sys
 from flask import Flask, render_template, request, jsonify, send_file, make_response
 from werkzeug.utils import secure_filename
+
+# ---------- Logger ----------
+from logger import setup_logger
+logger = setup_logger()
 
 # ---------- Smart Storage Management ----------
 def get_free_space(path='/'):
@@ -353,6 +357,7 @@ def run_pipeline(config_path, results_folder):
 
     except Exception as e:
         update_status(results_folder, "Error", 0, str(e))
+        logger.error(f"NGS Pipeline Error: {str(e)}")
 
 # ---------- Assembly routes ----------
 @app.route('/sanger_assemble', methods=['POST'])
@@ -403,10 +408,13 @@ def sanger_assemble():
             json.dump(result, f)
         return render_template('assemble_result.html', result=result, filename=files[0].filename, run_id=run_id)
     except ValueError as e:
+        logger.error(f"Sanger Assembly Error: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 400
     except RuntimeError as e:
+        logger.error(f"Sanger Assembly Error: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
     except Exception as e:
+        logger.error(f"Sanger Assembly Error: {str(e)}")
         return jsonify({"status": "error", "message": f"Unexpected error: {str(e)}"}), 500
 
 @app.route('/assemble_guided', methods=['POST'])
@@ -453,8 +461,10 @@ def assemble_guided():
             json.dump(result, f)
         return render_template('assemble_result.html', result=result, filename=files[0].filename, run_id=run_id)
     except RuntimeError as e:
+        logger.error(f"Guided Assembly Error: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
     except Exception as e:
+        logger.error(f"Guided Assembly Error: {str(e)}")
         return jsonify({"status": "error", "message": f"Unexpected error: {str(e)}"}), 500
 
 # ---------- Standard Routes ----------
@@ -515,17 +525,14 @@ def get_status(run_id):
 
 @app.route('/results/<run_id>')
 def view_results(run_id):
-    # ابتدا بررسی می‌کنیم که آیا تحلیل Sanger است یا NGS
     result_json = os.path.join(RESULTS_FOLDER, run_id, 'result.json')
     report_json = os.path.join(RESULTS_FOLDER, run_id, 'report.json')
 
     if os.path.exists(result_json):
-        # Sanger analysis
         with open(result_json) as f:
             result = json.load(f)
         return render_template('assemble_result.html', result=result, run_id=run_id)
     elif os.path.exists(report_json):
-        # NGS analysis
         with open(report_json) as f:
             report = json.load(f)
         variants_file = os.path.join(RESULTS_FOLDER, run_id, 'variants.json')
@@ -664,6 +671,16 @@ def report_pdf(run_id):
     response.headers['Content-Type'] = 'application/pdf'
     response.headers['Content-Disposition'] = f'attachment; filename=QuickNGS_report_{run_id}.pdf'
     return response
+
+# ---------- Log Viewer ----------
+@app.route('/log')
+def view_log():
+    log_path = 'app.log'
+    if not os.path.exists(log_path):
+        return "No log file yet."
+    with open(log_path, 'r') as f:
+        content = f.read()
+    return f"<pre style='white-space: pre-wrap; padding: 10px;'>{content}</pre>"
 
 # ---------- Info Pages ----------
 @app.route('/about')
