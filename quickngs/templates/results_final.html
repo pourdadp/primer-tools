@@ -92,15 +92,15 @@
 
 <script>
 function copyVariants() {
-    const table = document.getElementById('variantsTable');
-    const rows = table.querySelectorAll('tr');
-    let text = '';
-    rows.forEach(row => {
-        const cols = row.querySelectorAll('th, td');
-        const rowText = Array.from(cols).map(c => c.textContent.trim()).join('\t');
+    var table = document.getElementById('variantsTable');
+    var rows = table.querySelectorAll('tr');
+    var text = '';
+    rows.forEach(function(row) {
+        var cols = row.querySelectorAll('th, td');
+        var rowText = Array.from(cols).map(function(c) { return c.textContent.trim(); }).join('\t');
         text += rowText + '\n';
     });
-    navigator.clipboard.writeText(text).then(() => alert('Table copied to clipboard!'));
+    navigator.clipboard.writeText(text).then(function() { alert('Table copied to clipboard!'); });
 }
 </script>
 {% endblock %}
