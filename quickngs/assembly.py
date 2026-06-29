@@ -4,7 +4,8 @@ DNA Assembly Module for QuickNGS
 Algorithms: Greedy OLC, Semi‑Global Alignment, De Bruijn Graph
 Supports AB1, FASTA, seq formats via Biopython
 Handles multiple files, orientation control, quality trimming,
-intelligent clustering, optional cluster merging, and guided assembly.
+intelligent clustering, optional cluster merging, guided assembly,
+preserves original filenames, and reports trimming details.
 Powered by Pourdad Panahi – Built with DeepSeek AI
 """
 
@@ -39,13 +40,14 @@ def trim_by_quality(seq, qualities, threshold=20, window=5):
             break
     return seq[start:end], qualities[start:end]
 
-# ---------- File parsing ----------
+# ---------- File parsing (now returns labels) ----------
 def parse_uploaded_file(filepath, trim_low_quality=False, quality_threshold=20, window_size=5):
-    filename = os.path.basename(filepath).lower()
+    filename = os.path.basename(filepath)
     sequences = []
     trim_info = None
+    labels = []
     try:
-        if filename.endswith('.ab1'):
+        if filename.lower().endswith('.ab1'):
             record = SeqIO.read(filepath, 'abi')
             seq = str(record.seq)
             quals = record.letter_annotations.get('phred_quality', None)
@@ -54,30 +56,56 @@ def parse_uploaded_file(filepath, trim_low_quality=False, quality_threshold=20, 
                 seq, quals = trim_by_quality(seq, quals, quality_threshold, window_size)
                 trim_info = {'original': original_len, 'trimmed': len(seq), 'removed': original_len - len(seq)}
             sequences.append(seq)
-        elif filename.endswith(('.fasta', '.fa', '.fna')):
-            for record in SeqIO.parse(filepath, 'fasta'):
-                sequences.append(str(record.seq))
-        else:
-            with open(filepath, 'r') as f:
-                lines = f.read().strip().split('\n')
-                if lines and lines[0].startswith('>'):
-                    for record in SeqIO.parse(StringIO('\n'.join(lines)), 'fasta'):
-                        sequences.append(str(record.seq))
+            labels.append(filename)
+        elif filename.lower().endswith(('.fasta', '.fa', '.fna')):
+            records = list(SeqIO.parse(filepath, 'fasta'))
+            for i, record in enumerate(records):
+                seq = str(record.seq)
+                sequences.append(seq)
+                if len(records) > 1:
+                    labels.append(f"{filename} (seq {i+1})")
                 else:
-                    sequences = [line.strip() for line in lines if line.strip()]
+                    labels.append(filename)
+        else:  # plain text / .seq / .txt
+            with open(filepath, 'r') as f:
+                lines = [line.strip() for line in f if line.strip()]
+                if lines and lines[0].startswith('>'):
+                    records = list(SeqIO.parse(StringIO('\n'.join(lines)), 'fasta'))
+                    for i, record in enumerate(records):
+                        seq = str(record.seq)
+                        sequences.append(seq)
+                        if len(records) > 1:
+                            labels.append(f"{filename} (seq {i+1})")
+                        else:
+                            labels.append(filename)
+                else:
+                    for i, line in enumerate(lines):
+                        sequences.append(line)
+                        if len(lines) > 1:
+                            labels.append(f"{filename} (line {i+1})")
+                        else:
+                            labels.append(filename)
     except Exception as e:
         raise ValueError(f"Could not read {filename}: {str(e)}")
-    return sequences, trim_info
+    return sequences, trim_info, labels
 
 def parse_uploaded_files(filepaths, trim_low_quality=False, quality_threshold=20, window_size=5):
     all_reads = []
     all_trim_info = []
+    all_labels = []
+    trim_details = []
     for fp in filepaths:
-        reads, trim_info = parse_uploaded_file(fp, trim_low_quality, quality_threshold, window_size)
+        reads, trim_info, labels = parse_uploaded_file(fp, trim_low_quality, quality_threshold, window_size)
         all_reads.extend(reads)
+        all_labels.extend(labels)
         if trim_info:
-            all_trim_info.append(trim_info)
-    return all_reads, all_trim_info
+            trim_details.append({
+                'filename': os.path.basename(fp),
+                'original': trim_info['original'],
+                'trimmed': trim_info['trimmed'],
+                'removed': trim_info['removed']
+            })
+    return all_reads, all_trim_info, all_labels, trim_details
 
 # ---------- Utilities ----------
 def reverse_complement(seq):
@@ -392,7 +420,6 @@ def guided_assemble_fastq(r1_fastq, ref_fasta, results_folder):
         if not is_tool_available(tool):
             raise RuntimeError(f"{tool} is not installed.")
 
-    # Validate reference FASTA
     if not os.path.exists(ref_fasta):
         raise RuntimeError(f"Reference file not found: {ref_fasta}")
     if os.path.getsize(ref_fasta) == 0:
@@ -421,7 +448,6 @@ def guided_assemble_fastq(r1_fastq, ref_fasta, results_folder):
     except Exception as e:
         raise RuntimeError(f"Could not read reference file: {str(e)}")
 
-    # Index reference if needed
     if not os.path.exists(ref_fasta + ".bwt"):
         subprocess.run(["bwa", "index", ref_fasta], check=True, capture_output=True)
 
@@ -430,18 +456,15 @@ def guided_assemble_fastq(r1_fastq, ref_fasta, results_folder):
     bam_file = os.path.join(results_folder, f"{sample}.bam")
     sorted_bam = os.path.join(results_folder, f"{sample}.sorted.bam")
 
-    # Single‑end alignment
     with open(sam_file, 'w') as out:
         subprocess.run(['bwa', 'mem', '-M', '-R', f'@RG\\tID:{sample}\\tSM:{sample}',
                         ref_fasta, r1_fastq], stdout=out, stderr=subprocess.PIPE, check=True)
 
-    # Convert to BAM and sort
     with open(bam_file, 'w') as out:
         subprocess.run(['samtools', 'view', '-bS', sam_file], stdout=out, check=True)
     subprocess.run(['samtools', 'sort', '-o', sorted_bam, bam_file], check=True)
     subprocess.run(['samtools', 'index', sorted_bam], check=True)
 
-    # Generate consensus
     consensus_file = os.path.join(results_folder, f"{sample}_consensus.fa")
     with open(consensus_file, 'w') as out:
         p1 = subprocess.run(['samtools', 'mpileup', '-uf', ref_fasta, sorted_bam],
@@ -472,7 +495,7 @@ def guided_assemble_fastq(r1_fastq, ref_fasta, results_folder):
     return {
         'contig': contig, 'variants': [], 'avg_depth': avg_depth,
         'coverage_20x': cov_20x,
-        'placements': [{'seq': contig, 'start': 0, 'end': len(contig)-1, 'mismatches': set()}]
+        'placements': [{'seq': contig, 'start': 0, 'end': len(contig)-1, 'mismatches': []}]
     }
 
 # ---------- Master Assembly Function ----------
@@ -480,9 +503,12 @@ def assemble_reads_from_files(filepaths, mode='greedy', min_overlap=3, max_misma
                               orientation='auto', ref_fasta=None, results_folder=None,
                               trim_low_quality=False, quality_threshold=20, window_size=5):
     all_trim_info = []
+    all_labels = []
+    trim_details = []
 
     if ref_fasta:
-        reads, _ = parse_uploaded_files(filepaths, trim_low_quality, quality_threshold, window_size)
+        reads, _, labels, _ = parse_uploaded_files(filepaths, trim_low_quality, quality_threshold, window_size)
+        all_labels = labels
         r1_path = os.path.join(results_folder, 'combined_R1.fastq')
         with open(r1_path, 'w') as f1:
             for i, seq in enumerate(reads):
@@ -490,8 +516,15 @@ def assemble_reads_from_files(filepaths, mode='greedy', min_overlap=3, max_misma
                 f1.write(f"@read{i}\n{seq}\n+\n{qual}\n")
         return guided_assemble_fastq(r1_path, ref_fasta, results_folder)
 
-    reads, all_trim_info = parse_uploaded_files(filepaths, trim_low_quality, quality_threshold, window_size)
+    reads, all_trim_info, all_labels, trim_details = parse_uploaded_files(
+        filepaths, trim_low_quality, quality_threshold, window_size)
+
+    # Build index → label mapping
+    idx_to_label = {i: label for i, label in enumerate(all_labels)}
+
     clusters = cluster_reads(reads, min_overlap, max_mismatch)
+
+    all_used_indices = set()
 
     if len(clusters) > 1:
         contigs = []
@@ -510,6 +543,7 @@ def assemble_reads_from_files(filepaths, mode='greedy', min_overlap=3, max_misma
             if contig:
                 contigs.append(contig)
                 cluster_read_indices.append(indices)
+                all_used_indices.update(indices)
 
         merged_contigs, merge_map = merge_clusters(contigs, min_overlap=min_overlap*2, max_mismatch=max_mismatch)
 
@@ -521,14 +555,18 @@ def assemble_reads_from_files(filepaths, mode='greedy', min_overlap=3, max_misma
                 orig_idx = cluster_id - 1
                 if orig_idx < len(cluster_read_indices):
                     all_reads_used.extend(cluster_read_indices[orig_idx])
+            read_names = [idx_to_label[idx] for idx in sorted(set(all_reads_used))]
             all_contigs.append({
                 'cluster_id': i + 1,
                 'contig': contig,
                 'reads_used': len(all_reads_used),
-                'read_names': [f"read_{r+1}" for r in sorted(set(all_reads_used))],
+                'read_names': read_names,
                 'length': len(contig),
                 'merged_from': contributing if len(contributing) > 1 else None
             })
+
+        unused_indices = [i for i in range(len(reads)) if i not in all_used_indices]
+        unused_labels = [idx_to_label[i] for i in unused_indices]
 
         return {
             'contig': all_contigs[0]['contig'] if all_contigs else '',
@@ -538,7 +576,9 @@ def assemble_reads_from_files(filepaths, mode='greedy', min_overlap=3, max_misma
             'reads_count': len(reads),
             'mode': mode,
             'multi_cluster': True,
-            'trim_info': all_trim_info
+            'trim_info': all_trim_info,
+            'trim_details': trim_details,
+            'unused_reads': unused_labels
         }
     else:
         if mode == 'greedy':
@@ -551,11 +591,46 @@ def assemble_reads_from_files(filepaths, mode='greedy', min_overlap=3, max_misma
             res = {'contig': contig, 'k': k, 'reads_count': len(reads)}
         else:
             res = {'error': 'Unknown mode'}
+
+        # Determine unused reads using the same index‑to‑label mapping
+        unused_labels = []
+        if 'remaining' in res and res['remaining']:
+            remaining_seqs = res['remaining']
+            # Build reverse map from sequence to list of indices
+            seq_to_indices = {}
+            for idx, seq in enumerate(reads):
+                seq_to_indices.setdefault(seq, []).append(idx)
+            used_for_remaining = set()
+            for seq in remaining_seqs:
+                if seq in seq_to_indices:
+                    for i in seq_to_indices[seq]:
+                        if i not in used_for_remaining:
+                            used_for_remaining.add(i)
+                            break
+            unused_labels = [idx_to_label[i] for i in range(len(reads)) if i not in used_for_remaining]
+        elif 'steps' in res and res['steps']:
+            used_indices = set()
+            for step in res['steps']:
+                if 'seq' in step:
+                    seq = step['seq']
+                    if seq in reads:
+                        # find first occurrence not yet marked
+                        for idx, s in enumerate(reads):
+                            if s == seq and idx not in used_indices:
+                                used_indices.add(idx)
+                                break
+            all_used_indices = used_indices
+            unused_indices = [i for i in range(len(reads)) if i not in all_used_indices]
+            unused_labels = [idx_to_label[i] for i in unused_indices]
+
         res['reads_count'] = len(reads)
         res['multi_cluster'] = False
         res['all_contigs'] = [{'cluster_id': 1, 'contig': res['contig'], 'reads_used': len(reads),
-                                'read_names': [f"read_{i+1}" for i in range(len(reads))],
+                                'read_names': all_labels,
                                 'length': len(res['contig']), 'merged_from': None}]
         res['total_clusters'] = 1
         res['trim_info'] = all_trim_info
+        res['trim_details'] = trim_details
+        res['unused_reads'] = unused_labels
+
         return res
