@@ -112,33 +112,33 @@
 
 <script>
 (function() {
-    const seqInput = document.getElementById('seqFiles');
-    const refInput = document.getElementById('refFile');
-    const projectInput = document.getElementById('projectName');
-    const dynamicDiv = document.getElementById('dynamicSettings');
-    const startBtn = document.getElementById('startBtn');
-    let detectedMode = null;
+    var seqInput = document.getElementById('seqFiles');
+    var refInput = document.getElementById('refFile');
+    var projectInput = document.getElementById('projectName');
+    var dynamicDiv = document.getElementById('dynamicSettings');
+    var startBtn = document.getElementById('startBtn');
+    var detectedMode = null;
 
     document.addEventListener('click', function(e) {
-        const icon = e.target.closest('.help-icon');
+        var icon = e.target.closest('.help-icon');
         if (icon) {
             e.stopPropagation();
-            const tooltip = icon.querySelector('.help-tooltip');
-            const allTips = document.querySelectorAll('.help-tooltip');
-            const isVisible = tooltip.style.display === 'block';
-            allTips.forEach(t => t.style.display = 'none');
+            var tooltip = icon.querySelector('.help-tooltip');
+            var allTips = document.querySelectorAll('.help-tooltip');
+            var isVisible = tooltip.style.display === 'block';
+            allTips.forEach(function(t) { t.style.display = 'none'; });
             tooltip.style.display = isVisible ? 'none' : 'block';
         } else {
-            document.querySelectorAll('.help-tooltip').forEach(t => t.style.display = 'none');
+            document.querySelectorAll('.help-tooltip').forEach(function(t) { t.style.display = 'none'; });
         }
     });
 
     seqInput.addEventListener('change', function() {
-        const files = Array.from(this.files);
+        var files = Array.from(this.files);
         if (files.length === 0) { resetUI(); return; }
 
-        const hasFastq = files.some(f => /\.(fastq|fq|gz)$/i.test(f.name));
-        const hasSanger = files.some(f => /\.(ab1|seq|fasta|fa)$/i.test(f.name));
+        var hasFastq = files.some(function(f) { return /\.(fastq|fq|gz)$/i.test(f.name); });
+        var hasSanger = files.some(function(f) { return /\.(ab1|seq|fasta|fa)$/i.test(f.name); });
 
         if (hasFastq && hasSanger) {
             alert('Mixed file types detected. Please upload only NGS (FASTQ) or only Sanger (AB1/seq/FASTA) files.');
@@ -153,15 +153,15 @@
                 return;
             }
             detectedMode = 'ngs';
-            buildNGSForm(files);
+            buildNGSForm();
         } else {
             detectedMode = 'sanger';
             buildSangerForm(files);
         }
 
         if (!projectInput.value.trim()) {
-            const base = files[0].name.replace(/\.[^/.]+$/, "");
-            const date = new Date().toISOString().slice(0,10).replace(/-/g,'');
+            var base = files[0].name.replace(/\.[^/.]+$/, "");
+            var date = new Date().toISOString().slice(0,10).replace(/-/g,'');
             projectInput.value = base + '_' + date;
         }
 
@@ -181,122 +181,115 @@
         detectedMode = null;
     }
 
-    function buildNGSForm(files) {
+    function buildNGSForm() {
         dynamicDiv.style.display = 'block';
-        dynamicDiv.innerHTML = [
-            '<div class="card mb-2 shadow-sm border-0">',
-            '<div class="card-header bg-primary text-white py-1"><small>🔬 Reference‑Based NGS Settings</small></div>',
-            '<div class="card-body py-2 px-3">',
-            '<div class="row g-2">',
-            '<div class="col-md-6 mb-2">',
-            '<label class="form-label small mb-1">🧬 Reference Genome</label>',
-            '<select class="form-select form-select-sm" name="reference" id="refGenome">',
-            '<option value="hg38">Human (hg38)</option>',
-            '<option value="hg19">Human (hg19)</option>',
-            '<option value="mm10">Mouse (mm10)</option>',
-            '<option value="custom">Custom FASTA</option>',
-            '</select>',
-            '</div>',
-            '<div class="col-md-3 mb-2">',
-            '<label class="form-label small mb-1">Min Quality (Q) <span class="help-icon">?<span class="help-tooltip">Minimum Phred quality for trimming. Q20 = 1% error rate. Lower values keep more bases.</span></span></label>',
-            '<input type="number" class="form-control form-control-sm" name="min_quality" value="20">',
-            '</div>',
-            '<div class="col-md-3 mb-2">',
-            '<label class="form-label small mb-1">Min Depth <span class="help-icon">?<span class="help-tooltip">Minimum number of reads covering a position to call a variant. Higher values increase confidence.</span></span></label>',
-            '<input type="number" class="form-control form-control-sm" name="min_depth" value="10">',
-            '</div>',
-            '</div>',
-            '<div class="form-check form-switch">',
-            '<input class="form-check-input" type="checkbox" name="trim_adapters" id="trimAdapters" checked>',
-            '<label class="form-check-label small" for="trimAdapters">Trim Adapters <span class="help-icon">?<span class="help-tooltip">Remove sequencing adapters and low‑quality bases from the ends of reads (Trimmomatic).</span></span></label>',
-            '</div>',
-            '</div>',
-            '</div>'
-        ].join('');
+        var html = '<div class="card mb-2 shadow-sm border-0">' +
+            '<div class="card-header bg-primary text-white py-1"><small>🔬 Reference‑Based NGS Settings</small></div>' +
+            '<div class="card-body py-2 px-3">' +
+            '<div class="row g-2">' +
+            '<div class="col-md-6 mb-2">' +
+            '<label class="form-label small mb-1">🧬 Reference Genome</label>' +
+            '<select class="form-select form-select-sm" name="reference" id="refGenome">' +
+            '<option value="hg38">Human (hg38)</option>' +
+            '<option value="hg19">Human (hg19)</option>' +
+            '<option value="mm10">Mouse (mm10)</option>' +
+            '<option value="custom">Custom FASTA</option>' +
+            '</select>' +
+            '</div>' +
+            '<div class="col-md-3 mb-2">' +
+            '<label class="form-label small mb-1">Min Quality (Q) <span class="help-icon">?<span class="help-tooltip">Minimum Phred quality for trimming. Q20 = 1% error rate. Lower values keep more bases.</span></span></label>' +
+            '<input type="number" class="form-control form-control-sm" name="min_quality" value="20">' +
+            '</div>' +
+            '<div class="col-md-3 mb-2">' +
+            '<label class="form-label small mb-1">Min Depth <span class="help-icon">?<span class="help-tooltip">Minimum number of reads covering a position to call a variant. Higher values increase confidence.</span></span></label>' +
+            '<input type="number" class="form-control form-control-sm" name="min_depth" value="10">' +
+            '</div>' +
+            '</div>' +
+            '<div class="form-check form-switch">' +
+            '<input class="form-check-input" type="checkbox" name="trim_adapters" id="trimAdapters" checked>' +
+            '<label class="form-check-label small" for="trimAdapters">Trim Adapters <span class="help-icon">?<span class="help-tooltip">Remove sequencing adapters and low‑quality bases from the ends of reads (Trimmomatic).</span></span></label>' +
+            '</div>' +
+            '</div>' +
+            '</div>';
+        dynamicDiv.innerHTML = html;
 
         document.getElementById('refGenome').addEventListener('change', function() {
-            const customDiv = document.getElementById('customRefDiv');
+            var customDiv = document.getElementById('customRefDiv');
             if (!customDiv) {
-                const div = document.createElement('div');
-                div.id = 'customRefDiv';
-                div.innerHTML = '<input type="file" class="form-control form-control-sm mt-2" name="custom_reference" accept=".fasta,.fa,.fna">';
-                this.parentNode.appendChild(div);
+                customDiv = document.createElement('div');
+                customDiv.id = 'customRefDiv';
+                customDiv.innerHTML = '<input type="file" class="form-control form-control-sm mt-2" name="custom_reference" accept=".fasta,.fa,.fna">';
+                this.parentNode.appendChild(customDiv);
             }
             customDiv.style.display = this.value === 'custom' ? 'block' : 'none';
         });
     }
 
     function buildSangerForm(files) {
-        const refProvided = refInput.files.length > 0;
         dynamicDiv.style.display = 'block';
-        let fileRows = files.map((f, idx) => [
-            '<div class="row g-2 align-items-center mb-1">',
-            '<div class="col-7"><small>' + f.name + '</small></div>',
-            '<div class="col-5">',
-            '<select class="form-select form-select-sm" name="direction_' + idx + '">',
-            '<option value="auto">Auto</option>',
-            '<option value="forward">Forward</option>',
-            '<option value="reverse">Reverse</option>',
-            '</select>',
-            '</div>',
-            '</div>'
-        ].join('')).join('');
+        var refProvided = refInput.files.length > 0;
+        var hasAB1 = files.some(function(f) { return f.name.toLowerCase().endsWith('.ab1'); });
 
-        const hasAB1 = files.some(f => f.name.toLowerCase().endsWith('.ab1'));
+        var fileRows = '';
+        for (var i = 0; i < files.length; i++) {
+            fileRows += '<div class="row g-2 align-items-center mb-1">' +
+                '<div class="col-7"><small>' + files[i].name + '</small></div>' +
+                '<div class="col-5">' +
+                '<select class="form-select form-select-sm" name="direction_' + i + '">' +
+                '<option value="auto">Auto</option>' +
+                '<option value="forward">Forward</option>' +
+                '<option value="reverse">Reverse</option>' +
+                '</select>' +
+                '</div>' +
+                '</div>';
+        }
 
-        let html = [
-            '<div class="card mb-2 shadow-sm border-0">',
-            '<div class="card-header bg-success text-white py-1"><small>🧬 Sanger Analysis</small></div>',
-            '<div class="card-body py-2 px-3">',
-            '<p class="small mb-2"><strong>' + files.length + ' read(s)</strong> detected. ',
-            refProvided ? 'Reference provided → <span class="badge bg-info">Guided Assembly</span>' : 'No reference → <span class="badge bg-warning text-dark">De Novo Assembly</span>',
-            '</p>',
-            '<div class="mb-2"><label class="form-label small fw-bold mb-1">Direction (per read)</label>',
-            fileRows,
-            '</div>'
-        ];
+        var html = '<div class="card mb-2 shadow-sm border-0">' +
+            '<div class="card-header bg-success text-white py-1"><small>🧬 Sanger Analysis</small></div>' +
+            '<div class="card-body py-2 px-3">' +
+            '<p class="small mb-2"><strong>' + files.length + ' read(s)</strong> detected. ' +
+            (refProvided ? 'Reference provided → <span class="badge bg-info">Guided Assembly</span>' : 'No reference → <span class="badge bg-warning text-dark">De Novo Assembly</span>') +
+            '</p>' +
+            '<div class="mb-2"><label class="form-label small fw-bold mb-1">Direction (per read)</label>' +
+            fileRows +
+            '</div>';
 
         if (hasAB1) {
-            html.push(
-                '<div class="card bg-light mb-2">',
-                '<div class="card-body py-2 px-2">',
-                '<div class="form-check form-switch mb-1">',
-                '<input class="form-check-input" type="checkbox" name="trim_quality" id="trimQuality" checked>',
-                '<label class="form-check-label small" for="trimQuality">✂️ Trim low‑quality ends (Phred scores) <span class="help-icon">?<span class="help-tooltip">If checked, the beginning and end of the sequence are trimmed when their average quality (over the window) falls below the threshold.</span></span></label>',
-                '</div>',
-                '<div id="qualityParams" class="row g-2">',
-                '<div class="col-6">',
-                '<label class="form-label small mb-1">Min Quality (Q) <span class="help-icon">?<span class="help-tooltip">Minimum acceptable Phred quality. Q20 = 1% error. Lower values keep more bases.</span></span></label>',
-                '<input type="number" class="form-control form-control-sm" name="quality_threshold" value="20" min="5" max="40">',
-                '</div>',
-                '<div class="col-6">',
-                '<label class="form-label small mb-1">Window Size <span class="help-icon">?<span class="help-tooltip">Number of consecutive bases averaged to decide trimming. Larger windows smooth out random quality drops.</span></span></label>',
-                '<input type="number" class="form-control form-control-sm" name="window_size" value="5" min="1" max="20">',
-                '</div>',
-                '</div>',
-                '</div>',
-                '</div>'
-            );
+            html += '<div class="card bg-light mb-2">' +
+                '<div class="card-body py-2 px-2">' +
+                '<div class="form-check form-switch mb-1">' +
+                '<input class="form-check-input" type="checkbox" name="trim_quality" id="trimQuality" checked>' +
+                '<label class="form-check-label small" for="trimQuality">✂️ Trim low‑quality ends (Phred scores) <span class="help-icon">?<span class="help-tooltip">If checked, the beginning and end of the sequence are trimmed when their average quality (over the window) falls below the threshold.</span></span></label>' +
+                '</div>' +
+                '<div id="qualityParams" class="row g-2">' +
+                '<div class="col-6">' +
+                '<label class="form-label small mb-1">Min Quality (Q) <span class="help-icon">?<span class="help-tooltip">Minimum acceptable Phred quality. Q20 = 1% error. Lower values keep more bases.</span></span></label>' +
+                '<input type="number" class="form-control form-control-sm" name="quality_threshold" value="20" min="5" max="40">' +
+                '</div>' +
+                '<div class="col-6">' +
+                '<label class="form-label small mb-1">Window Size <span class="help-icon">?<span class="help-tooltip">Number of consecutive bases averaged to decide trimming. Larger windows smooth out random quality drops.</span></span></label>' +
+                '<input type="number" class="form-control form-control-sm" name="window_size" value="5" min="1" max="20">' +
+                '</div>' +
+                '</div>' +
+                '</div>' +
+                '</div>';
         }
 
         if (!refProvided) {
-            html.push(
-                '<div class="mb-2">',
-                '<label class="form-label small fw-bold mb-1">🧠 Assembly Algorithm</label>',
-                '<select class="form-select form-select-sm" name="algorithm">',
-                '<option value="greedy">Greedy OLC (Fast)</option>',
-                '<option value="alignment">Semi‑Global Alignment (Precise)</option>',
-                '<option value="debruijn">De Bruijn Graph</option>',
-                '</select>',
-                '</div>'
-            );
+            html += '<div class="mb-2">' +
+                '<label class="form-label small fw-bold mb-1">🧠 Assembly Algorithm</label>' +
+                '<select class="form-select form-select-sm" name="algorithm">' +
+                '<option value="greedy">Greedy OLC (Fast)</option>' +
+                '<option value="alignment">Semi‑Global Alignment (Precise)</option>' +
+                '<option value="debruijn">De Bruijn Graph</option>' +
+                '</select>' +
+                '</div>';
         }
 
-        html.push('</div>', '</div>');
+        html += '</div></div>';
+        dynamicDiv.innerHTML = html;
 
-        dynamicDiv.innerHTML = html.join('');
-
-        const trimCheckbox = document.getElementById('trimQuality');
+        var trimCheckbox = document.getElementById('trimQuality');
         if (trimCheckbox) {
             trimCheckbox.addEventListener('change', function() {
                 document.getElementById('qualityParams').style.display = this.checked ? 'flex' : 'none';
@@ -308,18 +301,18 @@
         e.preventDefault();
         if (!detectedMode) return;
 
-        const formData = new FormData(this);
-        const seqFiles = document.getElementById('seqFiles').files;
-        const refFile = document.getElementById('refFile').files[0];
+        var formData = new FormData(this);
+        var seqFiles = document.getElementById('seqFiles').files;
+        var refFile = document.getElementById('refFile').files[0];
         if (refFile) formData.append('ref_file', refFile);
 
-        let endpoint = '/start';
+        var endpoint = '/start';
         if (detectedMode === 'ngs') {
             formData.append('fastq_r1', seqFiles[0]);
             formData.append('fastq_r2', seqFiles[1]);
             endpoint = '/start_ngs';
         } else if (detectedMode === 'sanger') {
-            for (let f of seqFiles) formData.append('seq_files', f);
+            for (var i = 0; i < seqFiles.length; i++) formData.append('seq_files', seqFiles[i]);
             if (refFile) endpoint = '/assemble_guided';
             else endpoint = '/sanger_assemble';
         }
@@ -328,9 +321,9 @@
         document.getElementById('progress_section').scrollIntoView({ behavior: 'smooth' });
 
         fetch(endpoint, { method: 'POST', body: formData })
-        .then(r => r.text())
-        .then(html => { document.open(); document.write(html); document.close(); })
-        .catch(err => alert('Error: ' + err));
+        .then(function(r) { return r.text(); })
+        .then(function(html) { document.open(); document.write(html); document.close(); })
+        .catch(function(err) { alert('Error: ' + err); });
     });
 })();
 </script>
