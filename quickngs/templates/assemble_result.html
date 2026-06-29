@@ -11,7 +11,7 @@
         </p>
 
         {% if result.all_contigs %}
-            <!-- اگر چند کلاستر اولیه وجود داشته باشد، هشدار نمایش بده -->
+            <!-- Show explanation if multiple initial clusters were found -->
             {% if result.initial_clusters and result.initial_clusters > 1 %}
             <div class="alert alert-info py-2 px-3 small">
                 <strong>🔍 Why multiple contigs?</strong><br>
@@ -53,6 +53,12 @@
                         <button class="btn btn-sm btn-outline-info" data-bs-toggle="collapse" 
                                 data-bs-target="#blast_{{ contig_data.cluster_id }}">
                             🔍 BLAST
+                        </button>
+
+                        <!-- MSA Button -->
+                        <button class="btn btn-sm btn-outline-success" data-bs-toggle="collapse" 
+                                data-bs-target="#msa_{{ contig_data.cluster_id }}">
+                            📐 MSA
                         </button>
                         
                         <!-- Copy Button -->
@@ -136,6 +142,24 @@
                                     </div>
                                 </div>
                                 <div id="blast_result_{{ contig_data.cluster_id }}" class="mt-2"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MSA Section -->
+                    <div class="collapse mt-2" id="msa_{{ contig_data.cluster_id }}">
+                        <div class="card bg-light">
+                            <div class="card-body py-2 px-2">
+                                <p class="small mb-2">Compare this contig with other sequences (paste in FASTA format):</p>
+                                <textarea class="form-control form-control-sm mb-2" id="msa_sequences_{{ contig_data.cluster_id }}" 
+                                          rows="3" placeholder=">reference&#10;ATGCGT...&#10;>sample2&#10;ATGCGT..."></textarea>
+                                <div class="d-flex gap-2 align-items-center">
+                                    <button class="btn btn-sm btn-success" onclick="runMSA({{ contig_data.cluster_id }})">
+                                        Run Alignment
+                                    </button>
+                                    <small class="text-muted">Paste sequences in FASTA format. Each sequence starts with &gt;header on its own line.</small>
+                                </div>
+                                <div id="msa_result_{{ contig_data.cluster_id }}" class="mt-2"></div>
                             </div>
                         </div>
                     </div>
@@ -320,6 +344,71 @@ function runBlast(clusterId) {
     })
     .catch(err => {
         resultDiv.innerHTML = '<div class="alert alert-danger py-1 px-2 small">BLAST request failed.</div>';
+    });
+}
+
+// ========== MSA ==========
+function runMSA(clusterId) {
+    const contig = allContigs.find(c => c.cluster_id == clusterId);
+    if (!contig) return;
+    
+    const rawText = document.getElementById('msa_sequences_' + clusterId).value.trim();
+    if (!rawText) {
+        alert('Please paste at least one sequence in FASTA format.');
+        return;
+    }
+    
+    // Parse FASTA
+    const lines = rawText.split('\n');
+    const sequences = [contig.contig];
+    const labels = [`contig_${clusterId}`];
+    let currentLabel = null;
+    let currentSeq = '';
+    
+    for (const line of lines) {
+        if (line.startsWith('>')) {
+            if (currentLabel && currentSeq) {
+                sequences.push(currentSeq);
+                labels.push(currentLabel);
+            }
+            currentLabel = line.substring(1).trim() || `seq_${labels.length}`;
+            currentSeq = '';
+        } else if (line.trim()) {
+            currentSeq += line.trim().toUpperCase();
+        }
+    }
+    if (currentLabel && currentSeq) {
+        sequences.push(currentSeq);
+        labels.push(currentLabel);
+    }
+    
+    if (sequences.length < 2) {
+        alert('At least one additional sequence required for alignment.');
+        return;
+    }
+    
+    const resultDiv = document.getElementById('msa_result_' + clusterId);
+    resultDiv.innerHTML = '<div class="text-center"><span class="spinner-border spinner-border-sm"></span> Running MSA... (may take 10-30 seconds)</div>';
+    
+    fetch('/msa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            sequences: sequences,
+            labels: labels
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            resultDiv.innerHTML = `<div class="alert alert-danger py-1 px-2 small">${data.error}</div>`;
+            return;
+        }
+        
+        resultDiv.innerHTML = data.html;
+    })
+    .catch(err => {
+        resultDiv.innerHTML = '<div class="alert alert-danger py-1 px-2 small">MSA request failed.</div>';
     });
 }
 </script>
