@@ -321,9 +321,26 @@
         document.getElementById('progress_section').scrollIntoView({ behavior: 'smooth' });
 
         fetch(endpoint, { method: 'POST', body: formData })
-        .then(function(r) { return r.text(); })
-        .then(function(html) { document.open(); document.write(html); document.close(); })
-        .catch(function(err) { alert('Error: ' + err); });
+        .then(function(response) {
+            // اگر پاسخ JSON باشد (خطا)، آن را parse کن و خطا پرتاب کن
+            if (response.headers.get('content-type') && response.headers.get('content-type').includes('application/json')) {
+                return response.json().then(function(data) {
+                    throw new Error(data.message || 'Server error');
+                });
+            }
+            // در غیر این صورت HTML را برگردان
+            return response.text();
+        })
+        .then(function(html) {
+            // به جای document.write از Blob URL استفاده کن
+            var blob = new Blob([html], { type: 'text/html' });
+            var url = URL.createObjectURL(blob);
+            window.location.href = url;
+        })
+        .catch(function(err) {
+            alert('Error: ' + err.message);
+            document.getElementById('progress_section').style.display = 'none';
+        });
     });
 })();
 </script>
