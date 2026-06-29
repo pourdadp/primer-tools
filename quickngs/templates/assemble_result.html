@@ -11,7 +11,6 @@
         </p>
 
         {% if result.all_contigs %}
-            <!-- Show explanation if multiple initial clusters were found -->
             {% if result.initial_clusters and result.initial_clusters > 1 %}
             <div class="alert alert-info py-2 px-3 small">
                 <strong>🔍 Why multiple contigs?</strong><br>
@@ -35,33 +34,22 @@
                     {% endif %}
                 </div>
                 <div class="card-body bg-light py-2 px-3">
-                    <!-- Graphical Bar -->
                     <canvas id="graph_{{ contig_data.cluster_id }}" width="800" height="60" style="width:100%; max-height:60px;"></canvas>
-                    
-                    <!-- Sequence -->
                     <pre style="font-family: monospace; white-space: pre-wrap; word-break: break-all; max-height: 150px; overflow-y: auto; margin-top: 8px;">{{ contig_data.contig }}</pre>
                     
-                    <!-- Action Buttons -->
                     <div class="d-flex gap-2 mt-2 flex-wrap">
-                        <!-- Translate Button -->
                         <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" 
                                 data-bs-target="#translate_{{ contig_data.cluster_id }}">
                             🧬 Translate
                         </button>
-                        
-                        <!-- BLAST Button -->
                         <button class="btn btn-sm btn-outline-info" data-bs-toggle="collapse" 
                                 data-bs-target="#blast_{{ contig_data.cluster_id }}">
                             🔍 BLAST
                         </button>
-
-                        <!-- MSA Button -->
                         <button class="btn btn-sm btn-outline-success" data-bs-toggle="collapse" 
                                 data-bs-target="#msa_{{ contig_data.cluster_id }}">
                             📐 MSA
                         </button>
-                        
-                        <!-- Copy Button -->
                         <button class="btn btn-sm btn-outline-primary" onclick="copySingleContig('{{ contig_data.contig }}')">
                             📋 Copy
                         </button>
@@ -136,9 +124,7 @@
                                         </select>
                                     </div>
                                     <div class="col-auto">
-                                        <button class="btn btn-sm btn-info" onclick="runBlast({{ contig_data.cluster_id }})">
-                                            Run BLAST
-                                        </button>
+                                        <button class="btn btn-sm btn-info" onclick="runBlast({{ contig_data.cluster_id }})">Run BLAST</button>
                                     </div>
                                 </div>
                                 <div id="blast_result_{{ contig_data.cluster_id }}" class="mt-2"></div>
@@ -154,9 +140,7 @@
                                 <textarea class="form-control form-control-sm mb-2" id="msa_sequences_{{ contig_data.cluster_id }}" 
                                           rows="3" placeholder=">reference&#10;ATGCGT...&#10;>sample2&#10;ATGCGT..."></textarea>
                                 <div class="d-flex gap-2 align-items-center">
-                                    <button class="btn btn-sm btn-success" onclick="runMSA({{ contig_data.cluster_id }})">
-                                        Run Alignment
-                                    </button>
+                                    <button class="btn btn-sm btn-success" onclick="runMSA({{ contig_data.cluster_id }})">Run Alignment</button>
                                     <small class="text-muted">Paste sequences in FASTA format. Each sequence starts with &gt;header on its own line.</small>
                                 </div>
                                 <div id="msa_result_{{ contig_data.cluster_id }}" class="mt-2"></div>
@@ -182,28 +166,27 @@
 </div>
 
 <script>
-const allContigs = {{ result.all_contigs|tojson }};
+var allContigs = {{ result.all_contigs|tojson }};
 
-// ========== GRAPH DRAWING ==========
-allContigs.forEach(contig => {
-    const canvas = document.getElementById('graph_' + contig.cluster_id);
+// ---------- GRAPH DRAWING ----------
+allContigs.forEach(function(contig) {
+    var canvas = document.getElementById('graph_' + contig.cluster_id);
     if (!canvas) return;
     
-    const ctx = canvas.getContext('2d');
-    const width = canvas.parentElement.clientWidth - 20;
+    var ctx = canvas.getContext('2d');
+    var width = canvas.parentElement.clientWidth - 20;
     canvas.width = width;
     
-    const x = 10, barHeight = 30, y = 15;
-    const maxWidth = width - 20;
+    var x = 10, barHeight = 30, y = 15;
+    var maxWidth = width - 20;
     
-    // Draw background bar
     ctx.fillStyle = '#e9ecef';
     ctx.fillRect(x, y, maxWidth, barHeight);
     
     if (contig.merged_from && contig.merged_from.length > 1) {
-        const colors = ['#198754', '#0d6efd', '#6f42c1', '#fd7e14', '#d63384'];
-        const segmentWidth = maxWidth / contig.merged_from.length;
-        contig.merged_from.forEach((clusterId, i) => {
+        var colors = ['#198754', '#0d6efd', '#6f42c1', '#fd7e14', '#d63384'];
+        var segmentWidth = maxWidth / contig.merged_from.length;
+        contig.merged_from.forEach(function(clusterId, i) {
             ctx.fillStyle = colors[i % colors.length];
             ctx.fillRect(x + i * segmentWidth, y, segmentWidth, barHeight);
             ctx.fillStyle = 'white';
@@ -211,11 +194,11 @@ allContigs.forEach(contig => {
             ctx.fillText('C' + clusterId, x + i * segmentWidth + 5, y + barHeight - 8);
         });
     } else {
-        const intensity = Math.min(contig.reads_used / 10, 1);
-        const r = Math.floor(25 + (1 - intensity) * 200);
-        const g = Math.floor(135 - (1 - intensity) * 100);
-        const b = Math.floor(84 - (1 - intensity) * 50);
-        ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+        var intensity = Math.min(contig.reads_used / 10, 1);
+        var r = Math.floor(25 + (1 - intensity) * 200);
+        var g = Math.floor(135 - (1 - intensity) * 100);
+        var b = Math.floor(84 - (1 - intensity) * 50);
+        ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
         ctx.fillRect(x, y, maxWidth, barHeight);
         ctx.fillStyle = 'white';
         ctx.font = '10px sans-serif';
@@ -227,41 +210,41 @@ allContigs.forEach(contig => {
     ctx.strokeRect(x, y, maxWidth, barHeight);
 });
 
-// ========== COPY / SAVE ==========
+// ---------- COPY / SAVE ----------
 function copySingleContig(seq) {
-    navigator.clipboard.writeText(seq).then(() => alert('Contig copied!'));
+    navigator.clipboard.writeText(seq).then(function() { alert('Contig copied!'); });
 }
 
 function copyAllContigs() {
-    let text = allContigs.map(c => `>contig_${c.cluster_id} (${c.length} bp, ${c.reads_used} reads)\n${c.contig}`).join('\n\n');
-    navigator.clipboard.writeText(text).then(() => alert('All contigs copied!'));
+    var text = allContigs.map(function(c) { return '>contig_' + c.cluster_id + ' (' + c.length + ' bp, ' + c.reads_used + ' reads)\n' + c.contig; }).join('\n\n');
+    navigator.clipboard.writeText(text).then(function() { alert('All contigs copied!'); });
 }
 
 function saveAllContigs() {
-    let text = allContigs.map(c => `>contig_${c.cluster_id} (${c.length} bp, ${c.reads_used} reads)\n${c.contig}`).join('\n\n');
-    const blob = new Blob([text], {type: 'text/plain'});
-    const a = document.createElement('a');
+    var text = allContigs.map(function(c) { return '>contig_' + c.cluster_id + ' (' + c.length + ' bp, ' + c.reads_used + ' reads)\n' + c.contig; }).join('\n\n');
+    var blob = new Blob([text], {type: 'text/plain'});
+    var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'all_contigs.fasta';
     a.click();
 }
 
-// ========== TRANSLATION ==========
+// ---------- TRANSLATION ----------
 function toggleManualFrame(select, clusterId) {
-    const manualDiv = document.getElementById('manual_frame_div_' + clusterId);
+    var manualDiv = document.getElementById('manual_frame_div_' + clusterId);
     manualDiv.style.display = select.value === 'manual' ? 'block' : 'none';
 }
 
 function translateContig(clusterId) {
-    const contig = allContigs.find(c => c.cluster_id == clusterId);
+    var contig = allContigs.find(function(c) { return c.cluster_id == clusterId; });
     if (!contig) return;
     
-    const geneticCode = document.getElementById('gencode_' + clusterId).value;
-    const methodSelect = document.getElementById('method_' + clusterId);
-    const method = methodSelect.value;
-    const frameValue = method === 'manual' ? document.getElementById('frame_' + clusterId).value : 'auto';
+    var geneticCode = document.getElementById('gencode_' + clusterId).value;
+    var methodSelect = document.getElementById('method_' + clusterId);
+    var method = methodSelect.value;
+    var frameValue = method === 'manual' ? document.getElementById('frame_' + clusterId).value : 'auto';
     
-    const resultDiv = document.getElementById('translation_result_' + clusterId);
+    var resultDiv = document.getElementById('translation_result_' + clusterId);
     resultDiv.innerHTML = '<div class="text-center"><span class="spinner-border spinner-border-sm"></span> Translating...</div>';
     
     fetch('/translate', {
@@ -273,35 +256,35 @@ function translateContig(clusterId) {
             genetic_code: parseInt(geneticCode)
         })
     })
-    .then(r => r.json())
-    .then(data => {
-        const alertClass = data.color === 'success' ? 'alert-success' : 
-                          data.color === 'warning' ? 'alert-warning' : 'alert-info';
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        var alertClass = data.color === 'success' ? 'alert-success' : 
+                        data.color === 'warning' ? 'alert-warning' : 'alert-info';
         
-        let html = `<div class="alert ${alertClass} py-2 px-3 small mb-1">`;
-        html += `<strong>${data.method_description}</strong>`;
-        if (data.warning) html += `<br><small>⚠️ ${data.warning}</small>`;
-        html += `</div>`;
-        html += `<pre style="font-family: monospace; white-space: pre-wrap; word-break: break-all; background: white; padding: 8px; border-radius: 4px;">${data.protein}</pre>`;
-        html += `<small class="text-muted">${data.protein.length} amino acids | Frame ${data.frame:+d}</small>`;
+        var html = '<div class="alert ' + alertClass + ' py-2 px-3 small mb-1">';
+        html += '<strong>' + data.method_description + '</strong>';
+        if (data.warning) html += '<br><small>⚠️ ' + data.warning + '</small>';
+        html += '</div>';
+        html += '<pre style="font-family: monospace; white-space: pre-wrap; word-break: break-all; background: white; padding: 8px; border-radius: 4px;">' + data.protein + '</pre>';
+        html += '<small class="text-muted">' + data.protein.length + ' amino acids | Frame ' + (data.frame > 0 ? '+' : '') + data.frame + '</small>';
         
         resultDiv.innerHTML = html;
     })
-    .catch(err => {
+    .catch(function(err) {
         resultDiv.innerHTML = '<div class="alert alert-danger py-1 px-2 small">Translation failed.</div>';
     });
 }
 
-// ========== BLAST ==========
+// ---------- BLAST ----------
 function runBlast(clusterId) {
-    const contig = allContigs.find(c => c.cluster_id == clusterId);
+    var contig = allContigs.find(function(c) { return c.cluster_id == clusterId; });
     if (!contig) return;
     
-    const db = document.getElementById('blast_db_' + clusterId).value;
-    const program = document.getElementById('blast_program_' + clusterId).value;
-    const maxHits = document.getElementById('blast_max_' + clusterId).value;
+    var db = document.getElementById('blast_db_' + clusterId).value;
+    var program = document.getElementById('blast_program_' + clusterId).value;
+    var maxHits = document.getElementById('blast_max_' + clusterId).value;
     
-    const resultDiv = document.getElementById('blast_result_' + clusterId);
+    var resultDiv = document.getElementById('blast_result_' + clusterId);
     resultDiv.innerHTML = '<div class="text-center"><span class="spinner-border spinner-border-sm"></span> Running BLAST... (may take 30-60 seconds)</div>';
     
     fetch('/blast', {
@@ -315,10 +298,10 @@ function runBlast(clusterId) {
             max_hits: parseInt(maxHits)
         })
     })
-    .then(r => r.json())
-    .then(data => {
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
         if (data.error) {
-            resultDiv.innerHTML = `<div class="alert alert-danger py-1 px-2 small">${data.error}</div>`;
+            resultDiv.innerHTML = '<div class="alert alert-danger py-1 px-2 small">' + data.error + '</div>';
             return;
         }
         
@@ -327,51 +310,51 @@ function runBlast(clusterId) {
             return;
         }
         
-        let html = '<div class="table-responsive"><table class="table table-sm table-striped small mb-0">';
+        var html = '<div class="table-responsive"><table class="table table-sm table-striped small mb-0">';
         html += '<thead><tr><th>#</th><th>Description</th><th>Score</th><th>E-value</th><th>Identity</th><th>Link</th></tr></thead><tbody>';
-        data.forEach((hit, i) => {
-            html += `<tr>
-                <td>${i+1}</td>
-                <td><small>${(hit.title || 'N/A').substring(0, 80)}...</small></td>
-                <td>${hit.score || '-'}</td>
-                <td>${hit.evalue ? hit.evalue.toExponential(1) : '-'}</td>
-                <td>${hit.identity || '-'}%</td>
-                <td>${hit.link ? `<a href="${hit.link}" target="_blank">NCBI</a>` : '-'}</td>
-            </tr>`;
+        data.forEach(function(hit, i) {
+            html += '<tr>' +
+                '<td>' + (i+1) + '</td>' +
+                '<td><small>' + (hit.title || 'N/A').substring(0, 80) + '...</small></td>' +
+                '<td>' + (hit.score || '-') + '</td>' +
+                '<td>' + (hit.evalue ? hit.evalue.toExponential(1) : '-') + '</td>' +
+                '<td>' + (hit.identity || '-') + '%</td>' +
+                '<td>' + (hit.link ? '<a href="' + hit.link + '" target="_blank">NCBI</a>' : '-') + '</td>' +
+            '</tr>';
         });
         html += '</tbody></table></div>';
         resultDiv.innerHTML = html;
     })
-    .catch(err => {
+    .catch(function(err) {
         resultDiv.innerHTML = '<div class="alert alert-danger py-1 px-2 small">BLAST request failed.</div>';
     });
 }
 
-// ========== MSA ==========
+// ---------- MSA ----------
 function runMSA(clusterId) {
-    const contig = allContigs.find(c => c.cluster_id == clusterId);
+    var contig = allContigs.find(function(c) { return c.cluster_id == clusterId; });
     if (!contig) return;
     
-    const rawText = document.getElementById('msa_sequences_' + clusterId).value.trim();
+    var rawText = document.getElementById('msa_sequences_' + clusterId).value.trim();
     if (!rawText) {
         alert('Please paste at least one sequence in FASTA format.');
         return;
     }
     
-    // Parse FASTA
-    const lines = rawText.split('\n');
-    const sequences = [contig.contig];
-    const labels = [`contig_${clusterId}`];
-    let currentLabel = null;
-    let currentSeq = '';
+    var lines = rawText.split('\n');
+    var sequences = [contig.contig];
+    var labels = ['contig_' + clusterId];
+    var currentLabel = null;
+    var currentSeq = '';
     
-    for (const line of lines) {
+    for (var i = 0; i < lines.length; i++) {
+        var line = lines[i];
         if (line.startsWith('>')) {
             if (currentLabel && currentSeq) {
                 sequences.push(currentSeq);
                 labels.push(currentLabel);
             }
-            currentLabel = line.substring(1).trim() || `seq_${labels.length}`;
+            currentLabel = line.substring(1).trim() || 'seq_' + labels.length;
             currentSeq = '';
         } else if (line.trim()) {
             currentSeq += line.trim().toUpperCase();
@@ -387,7 +370,7 @@ function runMSA(clusterId) {
         return;
     }
     
-    const resultDiv = document.getElementById('msa_result_' + clusterId);
+    var resultDiv = document.getElementById('msa_result_' + clusterId);
     resultDiv.innerHTML = '<div class="text-center"><span class="spinner-border spinner-border-sm"></span> Running MSA... (may take 10-30 seconds)</div>';
     
     fetch('/msa', {
@@ -398,16 +381,15 @@ function runMSA(clusterId) {
             labels: labels
         })
     })
-    .then(r => r.json())
-    .then(data => {
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
         if (data.error) {
-            resultDiv.innerHTML = `<div class="alert alert-danger py-1 px-2 small">${data.error}</div>`;
+            resultDiv.innerHTML = '<div class="alert alert-danger py-1 px-2 small">' + data.error + '</div>';
             return;
         }
-        
         resultDiv.innerHTML = data.html;
     })
-    .catch(err => {
+    .catch(function(err) {
         resultDiv.innerHTML = '<div class="alert alert-danger py-1 px-2 small">MSA request failed.</div>';
     });
 }
