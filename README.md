@@ -1,4 +1,3 @@
-```markdown
 # 🧬 Primer Tools – Complete Molecular Biology Suite
 
 A comprehensive toolkit for molecular biology laboratories: primer management, PCR program storage, targeted sequencing panel optimization, and **smart NGS/Sanger analysis** – all in one place.
@@ -25,7 +24,7 @@ All three tools work together seamlessly: **manage primers in PDM → optimize p
 
 ---
 
-## 🧬 QuickNGS – The Smart Analysis Suite
+## 🧬 QuickNGS – The Smart Analysis Suite (v2.0)
 
 ### What it does
 **QuickNGS** automatically detects the type of input you provide (FASTQ → NGS; AB1/seq/FASTA → Sanger) and builds the appropriate pipeline.  
@@ -40,7 +39,10 @@ If a reference is provided, it performs **guided assembly**; otherwise it runs *
 - 🧪 **Sanger‑aware** – reads AB1, FASTA, plain text; per‑read direction control (Auto / Forward / Reverse)
 - ✂️ **Quality Trimming** – Phred‑based trimming for AB1 files with configurable threshold/window
 - 🧬 **Translation Module** – 5 methods (Reference, Longest ORF, First ATG, Stop codon, CAI) + 6 genetic codes
-- 📊 **Interactive report** – variant table, graphical contig view, downloadable FASTQ/VCF/contig
+- 🔍 **BLAST** – Search contigs against NCBI nucleotide/protein databases
+- 📐 **MSA** – Multiple Sequence Alignment with MUSCLE
+- 📄 **PDF Reports** – Downloadable A4 report for every analysis
+- 📊 **Interactive results** – variant tables, graphical contig views, trimming statistics, unused reads report
 - 💾 **Automatic storage management** – finds the largest available disk, no user intervention needed
 
 ### 📂 Location
@@ -49,8 +51,8 @@ If a reference is provided, it performs **guided assembly**; otherwise it runs *
 ### 🚀 Quick Start
 ```bash
 cd quickngs
-pip install -r requirements.txt
-python app.py
+bash install.sh
+python3 app.py
 # Open http://127.0.0.1:5002
 ```
 
@@ -142,6 +144,7 @@ python app.py
 │  • Create panels  │    coverage       │    (Greedy / Align / DBG) │
 │  • Manage stock   │  • Visualize      │  • Guided Assembly        │
 │  • Backup/restore │  • Export JSON    │  • Translate contigs      │
+│                   │                   │  • BLAST / MSA            │
 │                   │                   │  • Generate clinical report│
 └───────────────────┴───────────────────┴───────────────────────────┘
          │                    ▲                       ▲
@@ -161,46 +164,24 @@ primer-tools/
 ├── README.md                           # ← You are here
 ├── LICENSE
 ├── primer_database_manager/            # 🧬 PDM Application
-│   ├── app.py
-│   ├── database.py
-│   ├── auth.py
-│   ├── config.py
-│   ├── requirements.txt
-│   ├── install.bat / run.bat
-│   ├── templates/
-│   ├── static/
-│   └── backups/
 ├── sequencing_panel_optimizer/         # 🧬 SPO Application
-│   ├── app.py
-│   ├── requirements.txt
-│   ├── install.bat / run.bat
-│   ├── templates/
-│   ├── scripts/
-│   └── results/
 └── quickngs/                           # 🧬 QuickNGS Application
-    ├── app.py
-    ├── assembly.py                     # Assembly engine (Greedy, Align, DBG, Clustering, Merging, Guided)
-    ├── translation.py                  # Translation & Codon Usage (CAI) module
-    ├── requirements.txt
-    ├── config.yaml
-    ├── install.bat
-    ├── Dockerfile
-    ├── docker-compose.yml
-    ├── .gitignore
-    ├── templates/
-    │   ├── base.html
-    │   ├── index.html                  # Smart upload page
-    │   ├── results.html                # Live progress
-    │   ├── results_final.html          # Clinical report
-    │   ├── assemble_result.html        # Contig + graph + translation
-    │   ├── history.html
-    │   ├── about.html
-    │   └── help.html
-    ├── static/
-    │   ├── style.css
-    │   └── print.css
-    ├── test_data/                      # Sample data for testing
-    └── TODO.md
+    ├── app.py                          # Flask backend
+    ├── assembly.py                     # Assembly engine
+    ├── translation.py                  # Translation & Codon Usage
+    ├── blast.py                        # BLAST integration
+    ├── msa.py                          # Multiple Sequence Alignment
+    ├── logger.py                       # Logging system
+    ├── install.sh                      # One‑command installer
+    ├── requirements.txt                # Python dependencies
+    ├── Dockerfile                      # Docker image definition
+    ├── docker-compose.yml              # Docker Compose config
+    ├── install_tools.sh                # System tools installer
+    ├── CHANGELOG.md                    # Version history
+    ├── TODO.md                         # Future improvements
+    ├── templates/                      # HTML templates
+    ├── static/                         # CSS, JS, Bootstrap
+    └── test_data/                      # Sample data for testing
 ```
 
 ---
@@ -210,14 +191,15 @@ primer-tools/
 Prerequisites
 
 · Python 3.8 or higher
+· Linux (native or WSL2) for full bioinformatics pipeline
 · pip (Python package manager)
 
 QuickNGS (recommended to start)
 
 ```bash
 cd quickngs
-pip install -r requirements.txt
-python app.py
+bash install.sh
+python3 app.py
 # Open http://127.0.0.1:5002
 ```
 
@@ -258,6 +240,8 @@ PyYAML ❌ ❌ ✅ Configuration files
 BWA / Samtools ❌ ❌ ✅ NGS alignment
 FreeBayes / SnpEff ❌ ❌ ✅ Variant calling & annotation
 De Bruijn / Greedy / Semi‑Global ❌ ❌ ✅ De novo assembly
+MUSCLE ❌ ❌ ✅ Multiple sequence alignment
+WeasyPrint ❌ ❌ ✅ PDF report generation
 
 ---
 
@@ -283,6 +267,7 @@ Pourdad Panahi – Biotechnologist & Computational Biologist
 
 https://img.shields.io/badge/GitHub-pourdadp-black?logo=github
 https://img.shields.io/badge/Portfolio-Website-blue
+https://img.shields.io/badge/LinkedIn-pourdad--panahi-0A66C2?logo=linkedin
 
 ---
 
@@ -350,4 +335,3 @@ If you encounter any issues or have feature requests:
 <p align="center">
   <b>Made with 🧬 by a scientist who codes — powered by DeepSeek AI</b>
 </p>
-```
