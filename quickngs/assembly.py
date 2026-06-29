@@ -386,11 +386,15 @@ def merge_clusters(contigs, min_overlap=10, max_mismatch=0):
                 break
     return merged, final_merge_map
 
-# ---------- Guided Assembly (Single‑End) ----------
+# ---------- Guided Assembly (Single‑End, Auto‑Indexing) ----------
 def guided_assemble_fastq(r1_fastq, ref_fasta, results_folder):
     for tool in ['bwa', 'samtools', 'bcftools']:
         if not is_tool_available(tool):
             raise RuntimeError(f"{tool} is not installed.")
+
+    # Ensure reference is indexed
+    if not os.path.exists(ref_fasta + ".bwt"):
+        subprocess.run(["bwa", "index", ref_fasta], check=True, capture_output=True)
 
     sample = os.path.basename(r1_fastq).replace('_R1.fastq', '')
     sam_file = os.path.join(results_folder, f"{sample}.sam")
