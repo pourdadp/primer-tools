@@ -1,0 +1,63 @@
+<!-- templates/report_pdf.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>QuickNGS Report - {{ run_id }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; color: #333; }
+        h2 { color: #198754; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background: #f5f5f5; }
+        .footer { text-align: center; margin-top: 40px; font-size: 0.9em; color: #888; }
+        .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; color: white; font-size: 0.8em; }
+        .bg-secondary { background: #6c757d; } .bg-danger { background: #dc3545; }
+        pre { background: #f8f9fa; padding: 10px; border: 1px solid #eee; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h2>🧬 QuickNGS Analysis Report</h2>
+    <p><strong>Run ID:</strong> {{ run_id }}</p>
+
+    {% if mode == 'ngs' %}
+        <h3>NGS Pipeline Results</h3>
+        <p><strong>Sample:</strong> {{ report.sample_name }}</p>
+        <p><strong>Reference:</strong> {{ report.reference }}</p>
+        <p><strong>Average Depth:</strong> {{ report.average_depth }}x &nbsp;|&nbsp; 
+           <strong>Coverage ≥20x:</strong> {{ report.coverage_20x }}%</p>
+        <p><strong>Total Variants:</strong> {{ report.total_variants }}</p>
+
+        {% if variants %}
+        <h4>Variant Table</h4>
+        <table>
+            <thead><tr><th>Chr</th><th>Position</th><th>Ref</th><th>Alt</th><th>Gene</th><th>Impact</th></tr></thead>
+            <tbody>
+            {% for v in variants %}
+                <tr>
+                    <td>{{ v.chr }}</td>
+                    <td>{{ v.pos }}</td>
+                    <td><span class="badge bg-secondary">{{ v.ref }}</span></td>
+                    <td><span class="badge bg-danger">{{ v.alt }}</span></td>
+                    <td>{{ v.gene }}</td>
+                    <td>{{ v.impact }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    {% else %}
+        <h3>Sanger Assembly Results</h3>
+        <p><strong>Mode:</strong> {{ result.mode }} &nbsp;|&nbsp; <strong>Total Reads:</strong> {{ result.reads_count }}</p>
+        {% for ctg in result.all_contigs %}
+            <h4>Contig {{ ctg.cluster_id }}</h4>
+            <p><strong>Length:</strong> {{ ctg.length }} bp &nbsp;|&nbsp; <strong>Reads Used:</strong> {{ ctg.reads_used }}</p>
+            <pre>{{ ctg.contig }}</pre>
+        {% endfor %}
+    {% endif %}
+
+    <div class="footer">
+        <p>Powered by <strong>Pourdad Panahi</strong> – QuickNGS v2.0</p>
+    </div>
+</body>
+</html>
