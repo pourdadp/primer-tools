@@ -2,7 +2,7 @@
 """
 QuickNGS – From FASTQ/AB1 to clinical report or assembled contig.
 Real NGS pipeline (BWA + Samtools + FreeBayes + SnpEff) + De Novo / Guided Assembly.
-Includes Translation (5 methods, 6 genetic codes) and BLAST (NCBI Web + Local).
+Includes Translation (5 methods, 6 genetic codes), BLAST (NCBI Web + Local), and MSA (MUSCLE + Biopython).
 Powered by Pourdad Panahi – Built with DeepSeek AI
 """
 
@@ -571,6 +571,31 @@ def blast_sequence():
     
     from blast import run_blast
     result = run_blast(seq, mode, db, program, evalue, max_hits)
+    return jsonify(result)
+
+# ---------- MSA endpoint ----------
+@app.route('/msa', methods=['POST'])
+def msa_align():
+    data = request.get_json()
+    sequences = data.get('sequences', [])
+    labels = data.get('labels', None)
+    
+    if not sequences or len(sequences) < 2:
+        return jsonify({"status": "error", "message": "At least 2 sequences required for MSA."}), 400
+    
+    from msa import run_muscle, run_pairwise_alignment
+    
+    # Try MUSCLE first, fallback to pairwise for 2 sequences
+    result = run_muscle(sequences, labels)
+    
+    if 'error' in result and len(sequences) == 2:
+        # Fallback to Biopython's pairwise for 2 sequences
+        result = run_pairwise_alignment(
+            sequences[0], sequences[1],
+            labels[0] if labels else 'seq_1',
+            labels[1] if labels else 'seq_2'
+        )
+    
     return jsonify(result)
 
 # ---------- Info Pages ----------
