@@ -7,8 +7,55 @@
         <h4 class="fw-bold">🧬 Assembly Result</h4>
         <p class="text-muted small">
             Mode: {{ result.mode }} | Total reads: {{ result.reads_count }}
-            {% if result.trimmed %} | ✂️ Quality trimmed{% endif %}
+            {% if result.all_contigs %}
+                | Assembled: {{ result.all_contigs | sum(attribute='reads_used') }}
+            {% endif %}
+            {% if result.unused_reads %}
+                | Unused: {{ result.unused_reads | length }}
+            {% endif %}
+            {% if result.trim_details %} | ✂️ Quality trimmed ({{ result.trim_details | length }} file(s)){% endif %}
         </p>
+
+        {% if result.trim_details %}
+        <div class="card mb-3 shadow-sm border-0">
+            <div class="card-header bg-info text-white py-2">
+                <small class="fw-bold">✂️ Quality Trimming Details</small>
+            </div>
+            <div class="card-body py-2 px-3">
+                <div class="table-responsive">
+                    <table class="table table-sm small mb-0">
+                        <thead>
+                            <tr>
+                                <th>File</th>
+                                <th>Original (bp)</th>
+                                <th>Trimmed (bp)</th>
+                                <th>Removed (bp)</th>
+                                <th>Removed (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for td in result.trim_details %}
+                            <tr>
+                                <td>{{ td.filename }}</td>
+                                <td>{{ td.original }}</td>
+                                <td>{{ td.trimmed }}</td>
+                                <td>{{ td.removed }}</td>
+                                <td>{{ ((td.removed / td.original) * 100) | round(1) if td.original > 0 else 0 }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if result.unused_reads %}
+        <div class="alert alert-warning py-2 px-3 small">
+            <strong>⚠️ The following reads could not be assembled into any contig:</strong><br>
+            {{ result.unused_reads|join(', ') }}
+        </div>
+        {% endif %}
 
         {% if result.all_contigs %}
             {% if result.initial_clusters and result.initial_clusters > 1 %}
