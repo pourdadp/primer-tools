@@ -390,23 +390,24 @@ def sanger_assemble():
         filepaths.append(fpath)
 
     from assembly import assemble_reads_from_files
-    result = assemble_reads_from_files(
-        filepaths, mode=algorithm, orientation=orientation,
-        results_folder=results_dir,
-        trim_low_quality=trim_quality,
-        quality_threshold=quality_threshold,
-        window_size=window_size
-    )
-
-    # Save result for PDF
-    result_path = os.path.join(results_dir, 'result.json')
     try:
+        result = assemble_reads_from_files(
+            filepaths, mode=algorithm, orientation=orientation,
+            results_folder=results_dir,
+            trim_low_quality=trim_quality,
+            quality_threshold=quality_threshold,
+            window_size=window_size
+        )
+        result_path = os.path.join(results_dir, 'result.json')
         with open(result_path, 'w') as f:
-            json.dump(result, f, default=str)
-    except:
-        pass
-
-    return render_template('assemble_result.html', result=result, filename=files[0].filename, run_id=run_id)
+            json.dump(result, f)
+        return render_template('assemble_result.html', result=result, filename=files[0].filename, run_id=run_id)
+    except ValueError as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+    except RuntimeError as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Unexpected error: {str(e)}"}), 500
 
 @app.route('/assemble_guided', methods=['POST'])
 def assemble_guided():
@@ -440,22 +441,21 @@ def assemble_guided():
         filepaths.append(fpath)
 
     from assembly import assemble_reads_from_files
-    result = assemble_reads_from_files(
-        filepaths, ref_fasta=ref_path, results_folder=results_dir,
-        trim_low_quality=trim_quality,
-        quality_threshold=quality_threshold,
-        window_size=window_size
-    )
-
-    # Save result for PDF
-    result_path = os.path.join(results_dir, 'result.json')
     try:
+        result = assemble_reads_from_files(
+            filepaths, ref_fasta=ref_path, results_folder=results_dir,
+            trim_low_quality=trim_quality,
+            quality_threshold=quality_threshold,
+            window_size=window_size
+        )
+        result_path = os.path.join(results_dir, 'result.json')
         with open(result_path, 'w') as f:
-            json.dump(result, f, default=str)
-    except:
-        pass
-
-    return render_template('assemble_result.html', result=result, filename=files[0].filename, run_id=run_id)
+            json.dump(result, f)
+        return render_template('assemble_result.html', result=result, filename=files[0].filename, run_id=run_id)
+    except RuntimeError as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Unexpected error: {str(e)}"}), 500
 
 # ---------- Standard Routes ----------
 @app.route('/')
@@ -515,16 +515,27 @@ def get_status(run_id):
 
 @app.route('/results/<run_id>')
 def view_results(run_id):
-    report_file = os.path.join(RESULTS_FOLDER, run_id, 'report.json')
-    variants_file = os.path.join(RESULTS_FOLDER, run_id, 'variants.json')
-    report, variants = {}, []
-    if os.path.exists(report_file):
-        with open(report_file) as f:
+    # ابتدا بررسی می‌کنیم که آیا تحلیل Sanger است یا NGS
+    result_json = os.path.join(RESULTS_FOLDER, run_id, 'result.json')
+    report_json = os.path.join(RESULTS_FOLDER, run_id, 'report.json')
+
+    if os.path.exists(result_json):
+        # Sanger analysis
+        with open(result_json) as f:
+            result = json.load(f)
+        return render_template('assemble_result.html', result=result, run_id=run_id)
+    elif os.path.exists(report_json):
+        # NGS analysis
+        with open(report_json) as f:
             report = json.load(f)
-    if os.path.exists(variants_file):
-        with open(variants_file) as f:
-            variants = json.load(f)
-    return render_template('results_final.html', run_id=run_id, report=report, variants=variants)
+        variants_file = os.path.join(RESULTS_FOLDER, run_id, 'variants.json')
+        variants = []
+        if os.path.exists(variants_file):
+            with open(variants_file) as f:
+                variants = json.load(f)
+        return render_template('results_final.html', run_id=run_id, report=report, variants=variants)
+    else:
+        return jsonify({"status": "error", "message": "No result data found for this run."}), 404
 
 @app.route('/history')
 def history():
@@ -621,11 +632,11 @@ def report_pdf(run_id):
     try:
         from weasyprint import HTML
     except ImportError:
-        return "WeasyPrint is not installed. Please install it: pip install weasyprint", 500
+        return jsonify({"status": "error", "message": "WeasyPrint is not installed. Please install it: pip install weasyprint"}), 500
 
     run_dir = os.path.join(RESULTS_FOLDER, run_id)
     if not os.path.isdir(run_dir):
-        return "Run not found.", 404
+        return jsonify({"status": "error", "message": "Run not found."}), 404
 
     report_json = os.path.join(run_dir, 'report.json')
     result_json = os.path.join(run_dir, 'result.json')
@@ -644,7 +655,7 @@ def report_pdf(run_id):
             result = json.load(f)
         rendered = render_template('report_pdf.html', mode='sanger', result=result, run_id=run_id)
     else:
-        return "No result data found for this run.", 404
+        return jsonify({"status": "error", "message": "No result data found for this run."}), 404
 
     html = HTML(string=rendered)
     pdf = html.write_pdf()
