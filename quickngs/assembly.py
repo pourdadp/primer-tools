@@ -397,9 +397,20 @@ def guided_assemble_fastq(r1_fastq, r2_fastq, ref_fasta, results_folder):
     bam_file = os.path.join(results_folder, f"{sample}.bam")
     sorted_bam = os.path.join(results_folder, f"{sample}.sorted.bam")
     
-    with open(sam_file, 'w') as out:
-        subprocess.run(['bwa', 'mem', '-M', '-R', f'@RG\\tID:{sample}\\tSM:{sample}', ref_fasta, r1_fastq, r2_fastq],
-                       stdout=out, stderr=subprocess.PIPE, check=True)
+    # Check if R2 is empty (single-end Sanger data)
+    r2_empty = os.path.getsize(r2_fastq) < 20
+    
+    if r2_empty:
+        # Single-end alignment
+        with open(sam_file, 'w') as out:
+            subprocess.run(['bwa', 'mem', '-M', '-R', f'@RG\\tID:{sample}\\tSM:{sample}',
+                            ref_fasta, r1_fastq], stdout=out, stderr=subprocess.PIPE, check=True)
+    else:
+        # Paired-end alignment
+        with open(sam_file, 'w') as out:
+            subprocess.run(['bwa', 'mem', '-M', '-R', f'@RG\\tID:{sample}\\tSM:{sample}',
+                            ref_fasta, r1_fastq, r2_fastq], stdout=out, stderr=subprocess.PIPE, check=True)
+    
     with open(bam_file, 'w') as out:
         subprocess.run(['samtools', 'view', '-bS', sam_file], stdout=out, check=True)
     subprocess.run(['samtools', 'sort', '-o', sorted_bam, bam_file], check=True)
@@ -444,7 +455,7 @@ def assemble_reads_from_files(filepaths, mode='greedy', min_overlap=3, max_misma
             for i, seq in enumerate(reads):
                 qual = ''.join(chr(40+33) for _ in seq)
                 f1.write(f"@read{i}\n{seq}\n+\n{qual}\n")
-                f2.write(f"@read{i}_R2\n\n+\n\n")
+                f2.write(f"@read{i}_R2\n\n+\n\n")  # R2 empty
         return guided_assemble_fastq(r1_path, r2_path, ref_fasta, results_folder)
 
     reads, all_trim_info = parse_uploaded_files(filepaths, trim_low_quality, quality_threshold, window_size)
