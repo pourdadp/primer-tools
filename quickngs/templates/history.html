@@ -46,16 +46,17 @@
 function deleteRun(runId) {
     if (!confirm('Are you sure you want to delete this run and all its files?')) return;
     fetch('/delete/' + runId, { method: 'DELETE' })
-    .then(response => response.json())
-    .then(data => {
+    .then(function(response) { return response.json(); })
+    .then(function(data) {
         if (data.status === 'ok') {
-            document.getElementById('run-' + runId).remove();
+            var el = document.getElementById('run-' + runId);
+            if (el) el.remove();
             alert('Run deleted.');
         } else {
             alert('Error: ' + data.message);
         }
     })
-    .catch(err => alert('Network error: ' + err));
+    .catch(function(err) { alert('Network error: ' + err); });
 }
 </script>
 {% endblock %}
