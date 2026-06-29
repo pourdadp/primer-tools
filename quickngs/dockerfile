@@ -11,6 +11,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     freebayes \
     bcftools \
     snpeff \
+    muscle \
+    # WeasyPrint system dependencies
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libffi-dev \
+    libcairo2-dev \
+    libgdk-pixbuf2.0-0 \
+    shared-mime-info \
     && rm -rf /var/lib/apt/lists/*
 
 # Set SnpEff data directory (will be mounted as volume)
@@ -25,7 +33,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create folders that will be used as volumes (they can be mounted over)
+# Create folders that will be used as volumes
 RUN mkdir -p uploads results quickngs_cache /data/snpeff
 
 EXPOSE 5002
