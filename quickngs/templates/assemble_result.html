@@ -161,6 +161,7 @@
             <button class="btn btn-sm btn-primary" onclick="copyAllContigs()">📋 Copy All Contigs</button>
             <button class="btn btn-sm btn-outline-secondary" onclick="saveAllContigs()">💾 Save All (.fasta)</button>
             <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline-primary">🔄 New Analysis</a>
+            <a href="/report_pdf/{{ run_id }}" class="btn btn-sm btn-outline-success">📥 Download PDF</a>
         </div>
     </div>
 </div>
@@ -168,7 +169,6 @@
 <script>
 var allContigs = {{ result.all_contigs|tojson }};
 
-// ---------- GRAPH DRAWING ----------
 allContigs.forEach(function(contig) {
     var canvas = document.getElementById('graph_' + contig.cluster_id);
     if (!canvas) return;
@@ -210,7 +210,6 @@ allContigs.forEach(function(contig) {
     ctx.strokeRect(x, y, maxWidth, barHeight);
 });
 
-// ---------- COPY / SAVE ----------
 function copySingleContig(seq) {
     navigator.clipboard.writeText(seq).then(function() { alert('Contig copied!'); });
 }
@@ -229,7 +228,6 @@ function saveAllContigs() {
     a.click();
 }
 
-// ---------- TRANSLATION ----------
 function toggleManualFrame(select, clusterId) {
     var manualDiv = document.getElementById('manual_frame_div_' + clusterId);
     manualDiv.style.display = select.value === 'manual' ? 'block' : 'none';
@@ -275,7 +273,6 @@ function translateContig(clusterId) {
     });
 }
 
-// ---------- BLAST ----------
 function runBlast(clusterId) {
     var contig = allContigs.find(function(c) { return c.cluster_id == clusterId; });
     if (!contig) return;
@@ -330,7 +327,6 @@ function runBlast(clusterId) {
     });
 }
 
-// ---------- MSA ----------
 function runMSA(clusterId) {
     var contig = allContigs.find(function(c) { return c.cluster_id == clusterId; });
     if (!contig) return;
