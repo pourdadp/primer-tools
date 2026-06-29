@@ -386,45 +386,36 @@ def merge_clusters(contigs, min_overlap=10, max_mismatch=0):
                 break
     return merged, final_merge_map
 
-# ---------- Guided Assembly ----------
-def guided_assemble_fastq(r1_fastq, r2_fastq, ref_fasta, results_folder):
+# ---------- Guided Assembly (Single‑End) ----------
+def guided_assemble_fastq(r1_fastq, ref_fasta, results_folder):
     for tool in ['bwa', 'samtools', 'bcftools']:
         if not is_tool_available(tool):
-            raise RuntimeError(f"{tool} is not installed. Please install it before running guided assembly.")
-    
+            raise RuntimeError(f"{tool} is not installed.")
+
     sample = os.path.basename(r1_fastq).replace('_R1.fastq', '')
     sam_file = os.path.join(results_folder, f"{sample}.sam")
     bam_file = os.path.join(results_folder, f"{sample}.bam")
     sorted_bam = os.path.join(results_folder, f"{sample}.sorted.bam")
-    
-    # Check if R2 is empty (single-end Sanger data)
-    r2_empty = os.path.getsize(r2_fastq) < 20
-    
-    if r2_empty:
-        # Single-end alignment
-        with open(sam_file, 'w') as out:
-            subprocess.run(['bwa', 'mem', '-M', '-R', f'@RG\\tID:{sample}\\tSM:{sample}',
-                            ref_fasta, r1_fastq], stdout=out, stderr=subprocess.PIPE, check=True)
-    else:
-        # Paired-end alignment
-        with open(sam_file, 'w') as out:
-            subprocess.run(['bwa', 'mem', '-M', '-R', f'@RG\\tID:{sample}\\tSM:{sample}',
-                            ref_fasta, r1_fastq, r2_fastq], stdout=out, stderr=subprocess.PIPE, check=True)
-    
+
+    # Always single‑end
+    with open(sam_file, 'w') as out:
+        subprocess.run(['bwa', 'mem', '-M', '-R', f'@RG\\tID:{sample}\\tSM:{sample}',
+                        ref_fasta, r1_fastq], stdout=out, stderr=subprocess.PIPE, check=True)
+
     with open(bam_file, 'w') as out:
         subprocess.run(['samtools', 'view', '-bS', sam_file], stdout=out, check=True)
     subprocess.run(['samtools', 'sort', '-o', sorted_bam, bam_file], check=True)
     subprocess.run(['samtools', 'index', sorted_bam], check=True)
-    
+
     consensus_file = os.path.join(results_folder, f"{sample}_consensus.fa")
     with open(consensus_file, 'w') as out:
         p1 = subprocess.run(['samtools', 'mpileup', '-uf', ref_fasta, sorted_bam], capture_output=True, check=True)
         p2 = subprocess.run(['bcftools', 'call', '-c'], input=p1.stdout, capture_output=True, check=True)
         p3 = subprocess.run(['bcftools', 'consensus', '-f', ref_fasta], input=p2.stdout, stdout=out, check=True)
-    
+
     with open(consensus_file) as f:
         contig = f.read().strip()
-    
+
     avg_depth, cov_20x = 0, 0
     try:
         depth_out = subprocess.run(['samtools', 'depth', sorted_bam], capture_output=True, text=True)
@@ -434,7 +425,7 @@ def guided_assemble_fastq(r1_fastq, r2_fastq, ref_fasta, results_folder):
             cov_20x = sum(1 for d in depths if d >= 20) / len(depths) * 100
     except:
         pass
-    
+
     return {
         'contig': contig, 'variants': [], 'avg_depth': avg_depth,
         'coverage_20x': cov_20x,
@@ -446,17 +437,16 @@ def assemble_reads_from_files(filepaths, mode='greedy', min_overlap=3, max_misma
                               orientation='auto', ref_fasta=None, results_folder=None,
                               trim_low_quality=False, quality_threshold=20, window_size=5):
     all_trim_info = []
-    
+
     if ref_fasta:
         reads, _ = parse_uploaded_files(filepaths, trim_low_quality, quality_threshold, window_size)
         r1_path = os.path.join(results_folder, 'combined_R1.fastq')
-        r2_path = os.path.join(results_folder, 'combined_R2.fastq')
-        with open(r1_path, 'w') as f1, open(r2_path, 'w') as f2:
+        with open(r1_path, 'w') as f1:
             for i, seq in enumerate(reads):
                 qual = ''.join(chr(40+33) for _ in seq)
                 f1.write(f"@read{i}\n{seq}\n+\n{qual}\n")
-                f2.write(f"@read{i}_R2\n\n+\n\n")  # R2 empty
-        return guided_assemble_fastq(r1_path, r2_path, ref_fasta, results_folder)
+        # No R2 – Sanger data is single‑end
+        return guided_assemble_fastq(r1_path, ref_fasta, results_folder)
 
     reads, all_trim_info = parse_uploaded_files(filepaths, trim_low_quality, quality_threshold, window_size)
     clusters = cluster_reads(reads, min_overlap, max_mismatch)
