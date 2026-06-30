@@ -3,7 +3,7 @@
 QuickNGS – From FASTQ/AB1 to clinical report or assembled contig.
 Real NGS pipeline (BWA + Samtools + FreeBayes + SnpEff) + De Novo / Guided Assembly.
 Includes Translation (5 methods, 6 genetic codes), BLAST (NCBI Web + Local), MSA (MUSCLE + Biopython),
-PDF report generation, and logging.
+PDF report generation, logging, and smart storage management.
 Powered by Pourdad Panahi – Built with DeepSeek AI
 """
 
@@ -35,7 +35,6 @@ def find_best_storage():
     if root_free > 2 * 1024 * 1024 * 1024:
         default_uploads = os.path.join(os.getcwd(), 'uploads')
         default_results = os.path.join(os.getcwd(), 'results')
-        # Check writability
         if os.access(os.path.dirname(default_uploads), os.W_OK):
             logger.info(f"Using default storage at {os.getcwd()} (root has {human_readable_size(root_free)} free)")
             return default_uploads, default_results
@@ -417,11 +416,27 @@ def sanger_assemble():
             quality_threshold=quality_threshold,
             window_size=window_size
         )
+
+        # Filter contigs and compute all_unused for the template
+        filtered_contigs = [c for c in result['all_contigs'] if c['reads_used'] > 1]
+        extra_unused = [read for ctg in result['all_contigs'] if ctg['reads_used'] <= 1 for read in ctg['read_names']]
+        all_unused = result.get('unused_reads', []) + extra_unused
+
+        # Find max reads_used for progress bar
+        max_reads = max((c['reads_used'] for c in filtered_contigs), default=1)
+
         result_path = os.path.join(results_dir, 'result.json')
         with open(result_path, 'w') as f:
             json.dump(result, f)
+
         logger.info(f"Sanger assembly completed: {run_id}")
-        return render_template('assemble_result.html', result=result, filename=files[0].filename, run_id=run_id)
+        return render_template('assemble_result.html',
+                               result=result,
+                               filtered_contigs=filtered_contigs,
+                               all_unused=all_unused,
+                               max_reads=max_reads,
+                               filename=files[0].filename,
+                               run_id=run_id)
     except ValueError as e:
         logger.error(f"Sanger Assembly Error: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 400
@@ -471,11 +486,25 @@ def assemble_guided():
             quality_threshold=quality_threshold,
             window_size=window_size
         )
+
+        # Filter contigs
+        filtered_contigs = [c for c in result['all_contigs'] if c['reads_used'] > 1]
+        extra_unused = [read for ctg in result['all_contigs'] if ctg['reads_used'] <= 1 for read in ctg['read_names']]
+        all_unused = result.get('unused_reads', []) + extra_unused
+        max_reads = max((c['reads_used'] for c in filtered_contigs), default=1)
+
         result_path = os.path.join(results_dir, 'result.json')
         with open(result_path, 'w') as f:
             json.dump(result, f)
+
         logger.info(f"Guided assembly completed: {run_id}")
-        return render_template('assemble_result.html', result=result, filename=files[0].filename, run_id=run_id)
+        return render_template('assemble_result.html',
+                               result=result,
+                               filtered_contigs=filtered_contigs,
+                               all_unused=all_unused,
+                               max_reads=max_reads,
+                               filename=files[0].filename,
+                               run_id=run_id)
     except RuntimeError as e:
         logger.error(f"Guided Assembly Error: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -548,7 +577,17 @@ def view_results(run_id):
         try:
             with open(result_json) as f:
                 result = json.load(f)
-            return render_template('assemble_result.html', result=result, run_id=run_id)
+            # We also need to pass filtered_contigs etc. when viewing from History
+            filtered_contigs = [c for c in result['all_contigs'] if c['reads_used'] > 1]
+            extra_unused = [read for ctg in result['all_contigs'] if ctg['reads_used'] <= 1 for read in ctg['read_names']]
+            all_unused = result.get('unused_reads', []) + extra_unused
+            max_reads = max((c['reads_used'] for c in filtered_contigs), default=1)
+            return render_template('assemble_result.html',
+                                   result=result,
+                                   filtered_contigs=filtered_contigs,
+                                   all_unused=all_unused,
+                                   max_reads=max_reads,
+                                   run_id=run_id)
         except Exception as e:
             return f"Error reading Sanger result: {str(e)}", 500
 
@@ -670,7 +709,8 @@ def report_pdf(run_id):
 
     report_json = os.path.join(run_dir, 'report.json')
     result_json = os.path.join(run_dir, 'result.json')
-    
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+
     if os.path.exists(report_json):
         with open(report_json) as f:
             report = json.load(f)
@@ -679,11 +719,13 @@ def report_pdf(run_id):
         if os.path.exists(variants_file):
             with open(variants_file) as f:
                 variants = json.load(f)
-        rendered = render_template('report_pdf.html', mode='ngs', report=report, variants=variants, run_id=run_id)
+        rendered = render_template('report_pdf.html', mode='ngs', report=report, variants=variants,
+                                   run_id=run_id, timestamp=timestamp)
     elif os.path.exists(result_json):
         with open(result_json) as f:
             result = json.load(f)
-        rendered = render_template('report_pdf.html', mode='sanger', result=result, run_id=run_id)
+        rendered = render_template('report_pdf.html', mode='sanger', result=result,
+                                   run_id=run_id, timestamp=timestamp)
     else:
         return jsonify({"status": "error", "message": "No result data found for this run."}), 404
 
