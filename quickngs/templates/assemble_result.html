@@ -10,6 +10,7 @@
             {% if result.trim_details %} | ✂️ Quality trimmed ({{ result.trim_details | length }} file(s)){% endif %}
         </p>
 
+        <!-- Single read notice -->
         {% if result.reads_count == 1 %}
         <div class="alert alert-info py-2 px-3 small">
             <strong>ℹ️ Only one read was uploaded.</strong><br>
@@ -17,9 +18,12 @@
         </div>
         {% endif %}
 
+        <!-- Trimming details -->
         {% if result.trim_details %}
         <div class="card mb-3 shadow-sm border-0">
-            <div class="card-header bg-info text-white py-2"><small class="fw-bold">✂️ Quality Trimming Details</small></div>
+            <div class="card-header bg-info text-white py-2">
+                <small class="fw-bold">✂️ Quality Trimming Details</small>
+            </div>
             <div class="card-body py-2 px-3">
                 <div class="table-responsive">
                     <table class="table table-sm small mb-0">
@@ -35,6 +39,7 @@
         </div>
         {% endif %}
 
+        <!-- Filter contigs -->
         {% set filtered_contigs = [] %}
         {% set extra_unused = [] %}
         {% if result.reads_count > 1 %}
@@ -46,6 +51,7 @@
         {% endif %}
         {% set all_unused = result.unused_reads + extra_unused %}
 
+        <!-- Unused reads notice -->
         {% if all_unused %}
         <div class="alert alert-warning py-2 px-3 small">
             <strong>⚠️ The following reads could not be assembled into any contig:</strong><br>
@@ -53,6 +59,7 @@
         </div>
         {% endif %}
 
+        <!-- Contigs -->
         {% if filtered_contigs %}
             {% if result.initial_clusters and result.initial_clusters > 1 %}
             <div class="alert alert-info py-2 px-3 small">
@@ -72,75 +79,88 @@
                 <div class="card-header bg-success text-white py-2">
                     <strong>Contig {{ contig_data.cluster_id }}</strong>
                     ({{ contig_data.length }} bp, {{ contig_data.reads_used }} reads)
-                    {% if contig_data.merged_from %}<span class="badge bg-warning text-dark ms-2">⚡ Merged</span>{% endif %}
+                    {% if contig_data.merged_from %}
+                        <span class="badge bg-warning text-dark ms-2">⚡ Merged from clusters {{ contig_data.merged_from|join(', ') }}</span>
+                    {% endif %}
                 </div>
                 <div class="card-body bg-light py-2 px-3">
                     <canvas id="graph_{{ contig_data.cluster_id }}" width="800" height="60" style="width:100%; max-height:60px;"></canvas>
                     <pre style="font-family: monospace; white-space: pre-wrap; word-break: break-all; max-height: 150px; overflow-y: auto; margin-top: 8px;">{{ contig_data.contig }}</pre>
                     
-                    <div class="d-flex gap-2 mt-2 flex-wrap">
-                        <!-- Translation Collapse Button -->
-                        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#translateBox_{{ contig_data.cluster_id }}">🧬 Translate</button>
-                        <button class="btn btn-sm btn-outline-info" data-bs-toggle="collapse" data-bs-target="#blastBox_{{ contig_data.cluster_id }}">🔍 BLAST</button>
-                        <button class="btn btn-sm btn-outline-success" data-bs-toggle="collapse" data-bs-target="#msaBox_{{ contig_data.cluster_id }}">📐 MSA</button>
+                    <!-- Toolbar Area -->
+                    <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
+                        <!-- Translate -->
+                        <button class="btn btn-sm btn-primary" onclick="translateNow({{ contig_data.cluster_id }})">🧬 Translate</button>
+                        <a class="text-muted small" data-bs-toggle="collapse" href="#transOpts_{{ contig_data.cluster_id }}" role="button" title="Translation Settings">⚙️</a>
+                        
+                        <!-- BLAST -->
+                        <button class="btn btn-sm btn-outline-info" onclick="blastNow({{ contig_data.cluster_id }})">🔍 BLAST</button>
+                        <a class="text-muted small" data-bs-toggle="collapse" href="#blastOpts_{{ contig_data.cluster_id }}" role="button" title="BLAST Settings">⚙️</a>
+                        
+                        <!-- MSA -->
+                        <button class="btn btn-sm btn-outline-success" onclick="msaNow({{ contig_data.cluster_id }})">📐 MSA</button>
+                        <a class="text-muted small" data-bs-toggle="collapse" href="#msaBox_{{ contig_data.cluster_id }}" role="button" title="MSA Input">📝</a>
+                        
+                        <!-- Copy -->
                         <button class="btn btn-sm btn-outline-primary" onclick="copyNow('{{ contig_data.contig }}')">📋 Copy</button>
                     </div>
 
-                    <!-- TRANSLATE COLLAPSE -->
-                    <div class="collapse mt-2" id="translateBox_{{ contig_data.cluster_id }}">
-                        <div class="card bg-light"><div class="card-body py-2 px-2">
-                            <div class="row g-1 align-items-end">
-                                <div class="col-auto"><label class="form-label small mb-0">Code</label>
+                    <!-- Translation Options (Hidden) -->
+                    <div class="collapse mt-2" id="transOpts_{{ contig_data.cluster_id }}">
+                        <div class="card card-body py-2 px-2 bg-light">
+                            <div class="row g-2 align-items-center">
+                                <div class="col-auto"><small>Code</small>
                                     <select class="form-select form-select-sm" id="gencode_{{ contig_data.cluster_id }}">
                                         <option value="1">Standard</option><option value="4">Mycoplasma</option><option value="11">Bacteria</option><option value="3">Yeast Mito</option>
                                     </select>
                                 </div>
-                                <div class="col-auto"><label class="form-label small mb-0">Method</label>
-                                    <select class="form-select form-select-sm" id="method_{{ contig_data.cluster_id }}" onchange="toggleFrame(this, {{ contig_data.cluster_id }})">
-                                        <option value="auto">Auto</option><option value="longest_orf">Longest ORF</option><option value="first_atg">First ATG</option><option value="stop_codon">Stop Codon</option><option value="codon_usage">Codon Usage</option><option value="manual">Manual Frame</option>
+                                <div class="col-auto"><small>Method</small>
+                                    <select class="form-select form-select-sm" id="method_{{ contig_data.cluster_id }}" onchange="document.getElementById('frameDiv_{{ contig_data.cluster_id }}').style.display = this.value === 'manual' ? 'block' : 'none'">
+                                        <option value="auto">Auto</option><option value="longest_orf">Longest ORF</option><option value="first_atg">First ATG</option><option value="stop_codon">Stop Codon</option><option value="codon_usage">Codon Usage</option><option value="manual">Manual</option>
                                     </select>
                                 </div>
-                                <div class="col-auto" id="frameDiv_{{ contig_data.cluster_id }}" style="display:none;"><label class="form-label small mb-0">Frame</label>
+                                <div class="col-auto" id="frameDiv_{{ contig_data.cluster_id }}" style="display:none;"><small>Frame</small>
                                     <select class="form-select form-select-sm" id="frame_{{ contig_data.cluster_id }}">
                                         <option>+1</option><option>+2</option><option>+3</option><option>-1</option><option>-2</option><option>-3</option>
                                     </select>
                                 </div>
-                                <div class="col-auto"><button class="btn btn-sm btn-primary" onclick="applyTranslation({{ contig_data.cluster_id }})">Apply</button></div>
                             </div>
-                            <div id="translate_result_{{ contig_data.cluster_id }}" class="mt-2"></div>
-                        </div></div>
+                        </div>
                     </div>
 
-                    <!-- BLAST COLLAPSE -->
-                    <div class="collapse mt-2" id="blastBox_{{ contig_data.cluster_id }}">
-                        <div class="card bg-light"><div class="card-body py-2 px-2">
-                            <div class="row g-1 align-items-end">
-                                <div class="col-auto"><label class="form-label small mb-0">DB</label>
+                    <!-- BLAST Options (Hidden) -->
+                    <div class="collapse mt-2" id="blastOpts_{{ contig_data.cluster_id }}">
+                        <div class="card card-body py-2 px-2 bg-light">
+                            <div class="row g-2 align-items-center">
+                                <div class="col-auto"><small>DB</small>
                                     <select class="form-select form-select-sm" id="blast_db_{{ contig_data.cluster_id }}"><option value="nt">nt</option><option value="nr">nr</option></select>
                                 </div>
-                                <div class="col-auto"><label class="form-label small mb-0">Prog</label>
+                                <div class="col-auto"><small>Prog</small>
                                     <select class="form-select form-select-sm" id="blast_prog_{{ contig_data.cluster_id }}"><option value="blastn">blastn</option><option value="blastx">blastx</option></select>
                                 </div>
-                                <div class="col-auto"><label class="form-label small mb-0">Max</label>
+                                <div class="col-auto"><small>Max</small>
                                     <select class="form-select form-select-sm" id="blast_max_{{ contig_data.cluster_id }}"><option value="10">10</option><option value="50">50</option><option value="100">100</option></select>
                                 </div>
-                                <div class="col-auto"><button class="btn btn-sm btn-info" onclick="runBlast({{ contig_data.cluster_id }})">Run</button></div>
                             </div>
-                            <div id="blast_result_{{ contig_data.cluster_id }}" class="mt-2"></div>
-                        </div></div>
+                        </div>
                     </div>
 
-                    <!-- MSA COLLAPSE -->
+                    <!-- MSA Textarea (Hidden) -->
                     <div class="collapse mt-2" id="msaBox_{{ contig_data.cluster_id }}">
-                        <div class="card bg-light"><div class="card-body py-2 px-2">
-                            <p class="small mb-2">Paste additional sequences in FASTA format:</p>
-                            <textarea class="form-control form-control-sm mb-2" id="msa_seqs_{{ contig_data.cluster_id }}" rows="3" placeholder=">ref&#10;ATGC..."></textarea>
-                            <button class="btn btn-sm btn-success" onclick="runMSA({{ contig_data.cluster_id }})">Run Alignment</button>
-                            <div id="msa_result_{{ contig_data.cluster_id }}" class="mt-2"></div>
-                        </div></div>
+                        <div class="card card-body py-2 px-2 bg-light">
+                            <textarea class="form-control form-control-sm mb-2" id="msa_seqs_{{ contig_data.cluster_id }}" rows="3" placeholder=">reference&#10;ATGCGT...&#10;>sample2&#10;ATGCGT..."></textarea>
+                            <small class="text-muted">Paste additional sequences in FASTA format, then click 📐 MSA again.</small>
+                        </div>
                     </div>
+
+                    <!-- Result Divs -->
+                    <div id="translate_result_{{ contig_data.cluster_id }}" class="mt-2"></div>
+                    <div id="blast_result_{{ contig_data.cluster_id }}" class="mt-2"></div>
+                    <div id="msa_result_{{ contig_data.cluster_id }}" class="mt-2"></div>
                 </div>
-                <div class="card-footer py-1 px-3"><small class="text-muted">Reads used: {{ contig_data.read_names|join(', ') }}</small></div>
+                <div class="card-footer py-1 px-3">
+                    <small class="text-muted">Reads used: {{ contig_data.read_names|join(', ') }}</small>
+                </div>
             </div>
             {% endfor %}
         {% else %}
@@ -211,20 +231,29 @@ function saveAllNow() {
 }
 
 // ---------- TRANSLATION ----------
-function toggleFrame(sel, clusterId) {
-    document.getElementById('frameDiv_'+clusterId).style.display = sel.value === 'manual' ? 'block' : 'none';
-}
-function applyTranslation(clusterId) {
+function translateNow(clusterId) {
     var ctg = allContigs.find(function(c){ return c.cluster_id == clusterId; });
     if (!ctg) return;
-    var gcode = document.getElementById('gencode_'+clusterId).value;
-    var method = document.getElementById('method_'+clusterId).value;
-    var frameVal = method === 'manual' ? document.getElementById('frame_'+clusterId).value : 'auto';
+    
+    var gcode = document.getElementById('gencode_'+clusterId).value || '1';
+    var methodSel = document.getElementById('method_'+clusterId);
+    var method = methodSel ? methodSel.value : 'auto';
+    var frameVal = 'auto';
+    if (method === 'manual') {
+        var frameSel = document.getElementById('frame_'+clusterId);
+        frameVal = frameSel ? frameSel.value : '1';
+    }
+
     var div = document.getElementById('translate_result_'+clusterId);
     div.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Translating...';
+    
     fetch(window.location.origin+'/translate', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ sequence: ctg.contig, method: (method==='manual' ? parseInt(frameVal) : method), genetic_code: parseInt(gcode) })
+        body: JSON.stringify({
+            sequence: ctg.contig,
+            method: method === 'manual' ? parseInt(frameVal) : method,
+            genetic_code: parseInt(gcode)
+        })
     })
     .then(function(r){ return r.json(); })
     .then(function(data){
@@ -237,14 +266,17 @@ function applyTranslation(clusterId) {
 }
 
 // ---------- BLAST ----------
-function runBlast(clusterId) {
+function blastNow(clusterId) {
     var ctg = allContigs.find(function(c){ return c.cluster_id == clusterId; });
     if (!ctg) return;
-    var db = document.getElementById('blast_db_'+clusterId).value;
-    var prog = document.getElementById('blast_prog_'+clusterId).value;
-    var max = document.getElementById('blast_max_'+clusterId).value;
+    
+    var db = document.getElementById('blast_db_'+clusterId).value || 'nt';
+    var prog = document.getElementById('blast_prog_'+clusterId).value || 'blastn';
+    var max = document.getElementById('blast_max_'+clusterId).value || '50';
+
     var div = document.getElementById('blast_result_'+clusterId);
     div.innerHTML = '<span class="spinner-border spinner-border-sm"></span> BLASTing...';
+    
     fetch(window.location.origin+'/blast', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ sequence: ctg.contig, mode:'web', db:db, program:prog, max_hits:parseInt(max) })
@@ -264,11 +296,19 @@ function runBlast(clusterId) {
 }
 
 // ---------- MSA ----------
-function runMSA(clusterId) {
+function msaNow(clusterId) {
     var ctg = allContigs.find(function(c){ return c.cluster_id == clusterId; });
     if (!ctg) return;
+    
     var raw = document.getElementById('msa_seqs_'+clusterId).value.trim();
-    if (!raw) { alert('Paste sequences in FASTA format.'); return; }
+    if (!raw) {
+        alert('Please paste additional sequences in FASTA format inside the 📝 MSA box first.');
+        // Show the MSA box so the user can paste
+        var msaBox = document.getElementById('msaBox_'+clusterId);
+        if (msaBox) msaBox.classList.add('show');
+        return;
+    }
+    
     var lines = raw.split('\n');
     var seqs = [ctg.contig], labels = ['contig_'+clusterId];
     var curLab=null, curSeq='';
@@ -280,9 +320,11 @@ function runMSA(clusterId) {
         } else if (lines[i].trim()) { curSeq += lines[i].trim().toUpperCase(); }
     }
     if (curLab && curSeq) { seqs.push(curSeq); labels.push(curLab); }
-    if (seqs.length<2) { alert('Need at least 2 sequences.'); return; }
+    if (seqs.length<2) { alert('Need at least 2 sequences for alignment.'); return; }
+    
     var div = document.getElementById('msa_result_'+clusterId);
     div.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Aligning...';
+    
     fetch(window.location.origin+'/msa', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ sequences: seqs, labels: labels })
