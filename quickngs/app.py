@@ -35,7 +35,12 @@ def find_best_storage():
     if root_free > 2 * 1024 * 1024 * 1024:
         default_uploads = os.path.join(os.getcwd(), 'uploads')
         default_results = os.path.join(os.getcwd(), 'results')
-        return default_uploads, default_results
+        # Check writability
+        if os.access(os.path.dirname(default_uploads), os.W_OK):
+            logger.info(f"Using default storage at {os.getcwd()} (root has {human_readable_size(root_free)} free)")
+            return default_uploads, default_results
+        else:
+            logger.warning("Default storage not writable, searching for alternatives.")
 
     candidates = []
     for base in ['/media', '/mnt']:
@@ -49,15 +54,21 @@ def find_best_storage():
                         vol_path = os.path.join(user_path, volume)
                         if os.path.isdir(vol_path):
                             free = get_free_space(vol_path)
-                            if free > 10 * 1024 * 1024 * 1024:
+                            if free > 10 * 1024 * 1024 * 1024 and os.access(vol_path, os.W_OK):
                                 candidates.append((vol_path, free))
         except OSError:
             continue
 
     if not candidates:
-        return os.path.join(os.getcwd(), 'uploads'), os.path.join(os.getcwd(), 'results')
+        fallback_uploads = os.path.join(os.getcwd(), 'uploads')
+        fallback_results = os.path.join(os.getcwd(), 'results')
+        if os.access(os.path.dirname(fallback_uploads), os.W_OK):
+            logger.warning("No large writable volume found, using local directory.")
+            return fallback_uploads, fallback_results
+        raise RuntimeError("No writable storage directory found. Please check permissions or free up space.")
 
-    best_volume, _ = max(candidates, key=lambda x: x[1])
+    best_volume, best_free = max(candidates, key=lambda x: x[1])
+    logger.info(f"Selected storage volume: {best_volume} ({human_readable_size(best_free)} free)")
     base_path = os.path.join(best_volume, 'quickngs_data')
     uploads_path = os.path.join(base_path, 'uploads')
     results_path = os.path.join(base_path, 'results')
@@ -71,6 +82,9 @@ try:
     UPLOAD_FOLDER, RESULTS_FOLDER = find_best_storage()
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     os.makedirs(RESULTS_FOLDER, exist_ok=True)
+except RuntimeError as e:
+    print(f"Fatal Error: {str(e)}", file=sys.stderr)
+    sys.exit(1)
 except OSError as e:
     print(f"Fatal Error: Could not create storage directories. {e}", file=sys.stderr)
     sys.exit(1)
@@ -403,7 +417,6 @@ def sanger_assemble():
             quality_threshold=quality_threshold,
             window_size=window_size
         )
-        # Save result for PDF and History
         result_path = os.path.join(results_dir, 'result.json')
         with open(result_path, 'w') as f:
             json.dump(result, f)
@@ -528,7 +541,6 @@ def get_status(run_id):
 
 @app.route('/results/<run_id>')
 def view_results(run_id):
-    # First check Sanger result
     result_json = os.path.join(RESULTS_FOLDER, run_id, 'result.json')
     report_json = os.path.join(RESULTS_FOLDER, run_id, 'report.json')
 
