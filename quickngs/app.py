@@ -403,9 +403,11 @@ def sanger_assemble():
             quality_threshold=quality_threshold,
             window_size=window_size
         )
+        # Save result for PDF and History
         result_path = os.path.join(results_dir, 'result.json')
         with open(result_path, 'w') as f:
             json.dump(result, f)
+        logger.info(f"Sanger assembly completed: {run_id}")
         return render_template('assemble_result.html', result=result, filename=files[0].filename, run_id=run_id)
     except ValueError as e:
         logger.error(f"Sanger Assembly Error: {str(e)}")
@@ -459,6 +461,7 @@ def assemble_guided():
         result_path = os.path.join(results_dir, 'result.json')
         with open(result_path, 'w') as f:
             json.dump(result, f)
+        logger.info(f"Guided assembly completed: {run_id}")
         return render_template('assemble_result.html', result=result, filename=files[0].filename, run_id=run_id)
     except RuntimeError as e:
         logger.error(f"Guided Assembly Error: {str(e)}")
@@ -525,24 +528,32 @@ def get_status(run_id):
 
 @app.route('/results/<run_id>')
 def view_results(run_id):
+    # First check Sanger result
     result_json = os.path.join(RESULTS_FOLDER, run_id, 'result.json')
     report_json = os.path.join(RESULTS_FOLDER, run_id, 'report.json')
 
     if os.path.exists(result_json):
-        with open(result_json) as f:
-            result = json.load(f)
-        return render_template('assemble_result.html', result=result, run_id=run_id)
-    elif os.path.exists(report_json):
-        with open(report_json) as f:
-            report = json.load(f)
-        variants_file = os.path.join(RESULTS_FOLDER, run_id, 'variants.json')
-        variants = []
-        if os.path.exists(variants_file):
-            with open(variants_file) as f:
-                variants = json.load(f)
-        return render_template('results_final.html', run_id=run_id, report=report, variants=variants)
-    else:
-        return jsonify({"status": "error", "message": "No result data found for this run."}), 404
+        try:
+            with open(result_json) as f:
+                result = json.load(f)
+            return render_template('assemble_result.html', result=result, run_id=run_id)
+        except Exception as e:
+            return f"Error reading Sanger result: {str(e)}", 500
+
+    if os.path.exists(report_json):
+        try:
+            with open(report_json) as f:
+                report = json.load(f)
+            variants_file = os.path.join(RESULTS_FOLDER, run_id, 'variants.json')
+            variants = []
+            if os.path.exists(variants_file):
+                with open(variants_file) as f:
+                    variants = json.load(f)
+            return render_template('results_final.html', run_id=run_id, report=report, variants=variants)
+        except Exception as e:
+            return f"Error reading NGS result: {str(e)}", 500
+
+    return jsonify({"status": "error", "message": "No result data found for this run."}), 404
 
 @app.route('/history')
 def history():
