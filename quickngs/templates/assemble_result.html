@@ -16,6 +16,15 @@
             {% if result.trim_details %} | ✂️ Quality trimmed ({{ result.trim_details | length }} file(s)){% endif %}
         </p>
 
+        <!-- Single read notice -->
+        {% if result.reads_count == 1 %}
+        <div class="alert alert-info py-2 px-3 small">
+            <strong>ℹ️ Only one read was uploaded.</strong><br>
+            No assembly was performed. The single read is shown below.
+        </div>
+        {% endif %}
+
+        <!-- Trimming details -->
         {% if result.trim_details %}
         <div class="card mb-3 shadow-sm border-0">
             <div class="card-header bg-info text-white py-2">
@@ -50,6 +59,7 @@
         </div>
         {% endif %}
 
+        <!-- Unused reads notice (moved here, after trimming) -->
         {% if result.unused_reads %}
         <div class="alert alert-warning py-2 px-3 small">
             <strong>⚠️ The following reads could not be assembled into any contig:</strong><br>
@@ -57,6 +67,7 @@
         </div>
         {% endif %}
 
+        <!-- Contigs -->
         {% if result.all_contigs %}
             {% if result.initial_clusters and result.initial_clusters > 1 %}
             <div class="alert alert-info py-2 px-3 small">
