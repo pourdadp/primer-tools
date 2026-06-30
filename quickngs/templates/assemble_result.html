@@ -8,10 +8,12 @@
         <p class="text-muted small">
             Mode: {{ result.mode }} | Total reads: {{ result.reads_count }}
             {% if result.all_contigs %}
-                | Assembled: {{ result.all_contigs | sum(attribute='reads_used') }}
+                {% set total_assembled = result.all_contigs | sum(attribute='reads_used') %}
+                | Assembled: {{ total_assembled }}
             {% endif %}
-            {% if result.unused_reads %}
-                | Unused: {{ result.unused_reads | length }}
+            {% if result.unused_reads or extra_unused %}
+                {% set total_unused = (result.unused_reads | length) + (extra_unused | length) %}
+                | Unused: {{ total_unused }}
             {% endif %}
             {% if result.trim_details %} | ✂️ Quality trimmed ({{ result.trim_details | length }} file(s)){% endif %}
         </p>
@@ -59,16 +61,32 @@
         </div>
         {% endif %}
 
-        <!-- Unused reads notice (moved here, after trimming) -->
-        {% if result.unused_reads %}
+        <!-- Filter contigs: if multiple files, remove single-read contigs -->
+        {% set filtered_contigs = [] %}
+        {% set extra_unused = [] %}
+        {% if result.reads_count > 1 %}
+            {% for ctg in result.all_contigs %}
+                {% if ctg.reads_used > 1 %}
+                    {% set _ = filtered_contigs.append(ctg) %}
+                {% else %}
+                    {% set _ = extra_unused.extend(ctg.read_names) %}
+                {% endif %}
+            {% endfor %}
+        {% else %}
+            {% set filtered_contigs = result.all_contigs %}
+        {% endif %}
+
+        <!-- Unused reads notice (includes originally unused + filtered single-read contigs) -->
+        {% set all_unused = result.unused_reads + extra_unused %}
+        {% if all_unused %}
         <div class="alert alert-warning py-2 px-3 small">
             <strong>⚠️ The following reads could not be assembled into any contig:</strong><br>
-            {{ result.unused_reads|join(', ') }}
+            {{ all_unused|join(', ') }}
         </div>
         {% endif %}
 
         <!-- Contigs -->
-        {% if result.all_contigs %}
+        {% if filtered_contigs %}
             {% if result.initial_clusters and result.initial_clusters > 1 %}
             <div class="alert alert-info py-2 px-3 small">
                 <strong>🔍 Why multiple contigs?</strong><br>
@@ -82,7 +100,7 @@
             </div>
             {% endif %}
 
-            {% for contig_data in result.all_contigs %}
+            {% for contig_data in filtered_contigs %}
             <div class="card mb-3 shadow-sm">
                 <div class="card-header bg-success text-white py-2">
                     <strong>Contig {{ contig_data.cluster_id }}</strong>
@@ -225,8 +243,30 @@
 </div>
 
 <script>
-var allContigs = {{ result.all_contigs|tojson }};
+var allContigs = {{ filtered_contigs|tojson }};
 
+// Helper for clipboard (works on HTTP too)
+function copyTextToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(function() {
+            alert('Copied!');
+        });
+    } else {
+        var textArea = document.createElement('textarea');
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            alert('Copied!');
+        } catch (err) {
+            alert('Copy failed. Please copy manually.');
+        }
+        document.body.removeChild(textArea);
+    }
+}
+
+// ---------- GRAPH DRAWING ----------
 allContigs.forEach(function(contig) {
     var canvas = document.getElementById('graph_' + contig.cluster_id);
     if (!canvas) return;
@@ -268,13 +308,14 @@ allContigs.forEach(function(contig) {
     ctx.strokeRect(x, y, maxWidth, barHeight);
 });
 
+// ---------- COPY / SAVE ----------
 function copySingleContig(seq) {
-    navigator.clipboard.writeText(seq).then(function() { alert('Contig copied!'); });
+    copyTextToClipboard(seq);
 }
 
 function copyAllContigs() {
     var text = allContigs.map(function(c) { return '>contig_' + c.cluster_id + ' (' + c.length + ' bp, ' + c.reads_used + ' reads)\n' + c.contig; }).join('\n\n');
-    navigator.clipboard.writeText(text).then(function() { alert('All contigs copied!'); });
+    copyTextToClipboard(text);
 }
 
 function saveAllContigs() {
@@ -286,6 +327,7 @@ function saveAllContigs() {
     a.click();
 }
 
+// ---------- TRANSLATION ----------
 function toggleManualFrame(select, clusterId) {
     var manualDiv = document.getElementById('manual_frame_div_' + clusterId);
     manualDiv.style.display = select.value === 'manual' ? 'block' : 'none';
@@ -331,6 +373,7 @@ function translateContig(clusterId) {
     });
 }
 
+// ---------- BLAST ----------
 function runBlast(clusterId) {
     var contig = allContigs.find(function(c) { return c.cluster_id == clusterId; });
     if (!contig) return;
@@ -385,6 +428,7 @@ function runBlast(clusterId) {
     });
 }
 
+// ---------- MSA ----------
 function runMSA(clusterId) {
     var contig = allContigs.find(function(c) { return c.cluster_id == clusterId; });
     if (!contig) return;
