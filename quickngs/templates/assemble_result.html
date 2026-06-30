@@ -7,7 +7,7 @@
         <h4 class="fw-bold">🧬 Assembly Result</h4>
         <p class="text-muted small">
             Mode: {{ result.mode }} | Total reads: {{ result.reads_count }}
-            {% if result.trim_details %} | ✂️ Quality trimmed ({{ result.trim_details | length }} file(s)){% endif %}
+            {% if result.trim_details and result.trim_details|length > 0 %} | ✂️ Quality trimmed ({{ result.trim_details|length }} file(s)){% endif %}
         </p>
 
         {% if result.reads_count == 1 %}
@@ -17,7 +17,7 @@
         </div>
         {% endif %}
 
-        {% if result.trim_details %}
+        {% if result.trim_details and result.trim_details|length > 0 %}
         <div class="card mb-3 shadow-sm border-0">
             <div class="card-header bg-info text-white py-2">
                 <small class="fw-bold">✂️ Quality Trimming Details</small>
@@ -37,18 +37,7 @@
         </div>
         {% endif %}
 
-        {% set filtered_contigs = [] %}
-        {% set extra_unused = [] %}
-        {% if result.reads_count > 1 %}
-            {% for ctg in result.all_contigs %}
-                {% if ctg.reads_used > 1 %}{% set _ = filtered_contigs.append(ctg) %}{% else %}{% set _ = extra_unused.extend(ctg.read_names) %}{% endif %}
-            {% endfor %}
-        {% else %}
-            {% set filtered_contigs = result.all_contigs %}
-        {% endif %}
-        {% set all_unused = result.unused_reads + extra_unused %}
-
-        {% if all_unused %}
+        {% if all_unused and all_unused|length > 0 %}
         <div class="alert alert-warning py-2 px-3 small">
             <strong>⚠️ The following reads could not be assembled into any contig:</strong><br>
             {{ all_unused|join(', ') }}
@@ -71,10 +60,16 @@
 
             {% for contig_data in filtered_contigs %}
             <div class="card mb-3 shadow-sm">
-                <div class="card-header bg-success text-white py-2">
-                    <strong>Contig {{ contig_data.cluster_id }}</strong>
-                    ({{ contig_data.length }} bp, {{ contig_data.reads_used }} reads)
-                    {% if contig_data.merged_from %}<span class="badge bg-warning text-dark ms-2">⚡ Merged</span>{% endif %}
+                <div class="card-header bg-success text-white py-2 d-flex justify-content-between align-items-center">
+                    <span>
+                        <strong>Contig {{ contig_data.cluster_id }}</strong>
+                        ({{ contig_data.length }} bp, {{ contig_data.reads_used }} reads)
+                        {% if contig_data.merged_from %}<span class="badge bg-warning text-dark ms-2">⚡ Merged</span>{% endif %}
+                    </span>
+                    <!-- Progress bar for reads_used -->
+                    <div class="progress" style="height: 8px; width: 120px;" title="{{ contig_data.reads_used }} / {{ max_reads }} reads">
+                        <div class="progress-bar bg-warning" style="width: {{ ((contig_data.reads_used / max_reads) * 100) | round }}%"></div>
+                    </div>
                 </div>
                 <div class="card-body bg-light py-2 px-3">
                     <canvas id="graph_{{ contig_data.cluster_id }}" width="800" height="60" style="width:100%; max-height:60px;"></canvas>
