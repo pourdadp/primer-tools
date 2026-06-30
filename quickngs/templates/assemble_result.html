@@ -115,7 +115,10 @@ function translateNow(clusterId) {
     var div = document.getElementById('translate_result_' + clusterId);
     div.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Translating...';
 
-    fetch('/translate', {
+    // Use absolute URL to avoid any parsing issues
+    var url = window.location.origin + '/translate';
+
+    fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sequence: contig.contig, method: 'auto', genetic_code: 1 })
