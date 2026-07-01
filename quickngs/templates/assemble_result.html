@@ -152,9 +152,17 @@
             <div class="alert alert-warning">No contig assembled.</div>
         {% endif %}
 
-        <div class="d-flex gap-2 mt-3">
+        <!-- Bottom Action Bar -->
+        <div class="d-flex gap-2 mt-3 flex-wrap">
+            <button class="btn btn-sm btn-outline-dark" onclick="window.print()">🖨️ Print</button>
             <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline-primary">🔄 New Analysis</a>
+            <a href="/report_pdf/{{ run_id }}" class="btn btn-sm btn-outline-success">📥 Download PDF</a>
         </div>
+
+        <!-- Footer -->
+        <footer class="text-center mt-4 text-muted small">
+            <p>QuickNGS v2.0 · <a href="https://github.com/pourdadp/primer-tools" target="_blank">github.com/pourdadp/primer-tools</a></p>
+        </footer>
     </div>
 </div>
 
