@@ -40,7 +40,7 @@ def trim_by_quality(seq, qualities, threshold=20, window=5):
             break
     return seq[start:end], qualities[start:end]
 
-# ---------- File parsing (now returns labels) ----------
+# ---------- File parsing ----------
 def parse_uploaded_file(filepath, trim_low_quality=False, quality_threshold=20, window_size=5):
     filename = os.path.basename(filepath)
     sequences = []
@@ -66,7 +66,7 @@ def parse_uploaded_file(filepath, trim_low_quality=False, quality_threshold=20, 
                     labels.append(f"{filename} (seq {i+1})")
                 else:
                     labels.append(filename)
-        else:  # plain text / .seq / .txt
+        else:
             with open(filepath, 'r') as f:
                 lines = [line.strip() for line in f if line.strip()]
                 if lines and lines[0].startswith('>'):
@@ -300,7 +300,7 @@ def assemble_with_alignment(reads, min_overlap=3, orientation='auto'):
                 break
     return contig
 
-# ---------- De Bruijn Graph (Fixed: cycle detection, max length, auto k) ----------
+# ---------- De Bruijn Graph ----------
 def debruijn_assemble(reads, k=3):
     if not reads:
         return ''
@@ -427,12 +427,13 @@ def merge_clusters(contigs, min_overlap=10, max_mismatch=0):
                 break
     return merged, final_merge_map
 
-# ---------- Guided Assembly (with bcftools pipeline) ----------
+# ---------- Guided Assembly (stable step-by-step) ----------
 def guided_assemble_fastq(r1_fastq, ref_fasta, results_folder):
     for tool in ['bwa', 'samtools', 'bcftools']:
         if not is_tool_available(tool):
             raise RuntimeError(f"{tool} is not installed.")
 
+    # validate reference
     if not os.path.exists(ref_fasta):
         raise RuntimeError(f"Reference file not found: {ref_fasta}")
     if os.path.getsize(ref_fasta) == 0:
@@ -468,8 +469,10 @@ def guided_assemble_fastq(r1_fastq, ref_fasta, results_folder):
     sam_file = os.path.join(results_folder, f"{sample}.sam")
     bam_file = os.path.join(results_folder, f"{sample}.bam")
     sorted_bam = os.path.join(results_folder, f"{sample}.sorted.bam")
+    vcf_file = os.path.join(results_folder, f"{sample}.vcf")
+    consensus_file = os.path.join(results_folder, f"{sample}_consensus.fa")
 
-    # Alignment (single-end)
+    # Alignment (single‑end)
     with open(sam_file, 'w') as out:
         subprocess.run(['bwa', 'mem', '-M', '-R', f'@RG\\tID:{sample}\\tSM:{sample}',
                         ref_fasta, r1_fastq], stdout=out, stderr=subprocess.PIPE, check=True)
@@ -478,36 +481,25 @@ def guided_assemble_fastq(r1_fastq, ref_fasta, results_folder):
     subprocess.run(['samtools', 'sort', '-o', sorted_bam, bam_file], check=True)
     subprocess.run(['samtools', 'index', sorted_bam], check=True)
 
-    # Generate consensus using a single pipeline (mpileup → call → consensus)
-    consensus_file = os.path.join(results_folder, f"{sample}_consensus.fa")
+    # Step 1: mpileup → BCF
+    bcf_file = os.path.join(results_folder, f"{sample}.bcf")
+    with open(bcf_file, 'wb') as out:
+        subprocess.run(['bcftools', 'mpileup', '-Ou', '-f', ref_fasta, sorted_bam],
+                      stdout=out, stderr=subprocess.PIPE, check=True)
+
+    # Step 2: call variants → VCF
+    with open(vcf_file, 'w') as out:
+        subprocess.run(['bcftools', 'call', '-c', bcf_file],
+                      stdout=out, stderr=subprocess.PIPE, check=True)
+
+    # Step 3: consensus → FASTA
     with open(consensus_file, 'w') as out:
-        # mpileup with bcftools (no legacy -u option)
-        mpileup = subprocess.Popen(
-            ['bcftools', 'mpileup', '-Ou', '-f', ref_fasta, sorted_bam],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-        # call variants
-        call = subprocess.Popen(
-            ['bcftools', 'call', '-c'],
-            stdin=mpileup.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-        # generate consensus
-        consensus = subprocess.run(
-            ['bcftools', 'consensus', '-f', ref_fasta],
-            stdin=call.stdout, stdout=out, stderr=subprocess.PIPE, check=False
-        )
-        # Check for errors
-        mpileup.stdout.close()
-        call.stdout.close()
-        mpileup.wait()
-        call.wait()
-        if consensus.returncode != 0:
-            raise RuntimeError(f"bcftools consensus failed: {consensus.stderr.decode().strip()}")
+        subprocess.run(['bcftools', 'consensus', '-f', ref_fasta, vcf_file],
+                      stdout=out, stderr=subprocess.PIPE, check=True)
 
     with open(consensus_file) as f:
         contig = f.read().strip()
 
-    # Coverage statistics
     avg_depth, cov_20x = 0, 0
     try:
         depth_out = subprocess.run(['samtools', 'depth', sorted_bam], capture_output=True, text=True)
