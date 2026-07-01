@@ -427,7 +427,7 @@ def merge_clusters(contigs, min_overlap=10, max_mismatch=0):
                 break
     return merged, final_merge_map
 
-# ---------- Guided Assembly (with bcftools mpileup) ----------
+# ---------- Guided Assembly (with bcftools pipeline) ----------
 def guided_assemble_fastq(r1_fastq, ref_fasta, results_folder):
     for tool in ['bwa', 'samtools', 'bcftools']:
         if not is_tool_available(tool):
@@ -478,29 +478,36 @@ def guided_assemble_fastq(r1_fastq, ref_fasta, results_folder):
     subprocess.run(['samtools', 'sort', '-o', sorted_bam, bam_file], check=True)
     subprocess.run(['samtools', 'index', sorted_bam], check=True)
 
-    # Variant calling and consensus using bcftools mpileup (compatible with newer versions)
-    bcf_file = os.path.join(results_folder, f"{sample}.bcf")
+    # Generate consensus using a single pipeline (mpileup → call → consensus)
     consensus_file = os.path.join(results_folder, f"{sample}_consensus.fa")
-
-    # mpileup: generate BCF (uncompressed) via bcftools
-    with open(bcf_file, 'w') as bcf_out:
-        p1 = subprocess.run(['bcftools', 'mpileup', '-Ou', '-f', ref_fasta, sorted_bam],
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-        # call variants (consensus caller)
-        p2 = subprocess.run(['bcftools', 'call', '-c', '-o', bcf_file],
-                            input=p1.stdout, stderr=subprocess.PIPE, check=False)
-        if p2.returncode != 0:
-            # fallback: write to stdout and redirect
-            with open(bcf_file, 'wb') as f:
-                subprocess.run(['bcftools', 'call', '-c'], input=p1.stdout, stdout=f, check=True)
-
-    # Generate consensus from BCF
     with open(consensus_file, 'w') as out:
-        subprocess.run(['bcftools', 'consensus', '-f', ref_fasta, bcf_file], stdout=out, check=True)
+        # mpileup with bcftools (no legacy -u option)
+        mpileup = subprocess.Popen(
+            ['bcftools', 'mpileup', '-Ou', '-f', ref_fasta, sorted_bam],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+        # call variants
+        call = subprocess.Popen(
+            ['bcftools', 'call', '-c'],
+            stdin=mpileup.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+        # generate consensus
+        consensus = subprocess.run(
+            ['bcftools', 'consensus', '-f', ref_fasta],
+            stdin=call.stdout, stdout=out, stderr=subprocess.PIPE, check=False
+        )
+        # Check for errors
+        mpileup.stdout.close()
+        call.stdout.close()
+        mpileup.wait()
+        call.wait()
+        if consensus.returncode != 0:
+            raise RuntimeError(f"bcftools consensus failed: {consensus.stderr.decode().strip()}")
 
     with open(consensus_file) as f:
         contig = f.read().strip()
 
+    # Coverage statistics
     avg_depth, cov_20x = 0, 0
     try:
         depth_out = subprocess.run(['samtools', 'depth', sorted_bam], capture_output=True, text=True)
