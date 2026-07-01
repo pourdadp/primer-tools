@@ -22,7 +22,14 @@ from werkzeug.utils import secure_filename
 from logger import setup_logger
 logger = setup_logger()
 
-# ---------- Smart Storage Management ----------
+# ---------- Helper Functions (must be defined early) ----------
+def human_readable_size(size_bytes):
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+        if size_bytes < 1024.0:
+            return f"{size_bytes:.1f} {unit}"
+        size_bytes /= 1024.0
+    return f"{size_bytes:.1f} PB"
+
 def get_free_space(path='/'):
     try:
         stat = shutil.disk_usage(path)
@@ -30,6 +37,7 @@ def get_free_space(path='/'):
     except OSError:
         return 0
 
+# ---------- Smart Storage Management ----------
 def find_best_storage():
     root_free = get_free_space('/')
     if root_free > 2 * 1024 * 1024 * 1024:
@@ -96,7 +104,7 @@ app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024 * 1024  # 10 GB
 
 ALLOWED_EXTENSIONS = {'fastq', 'fq', 'gz', 'fasta', 'fa', 'fna', 'ab1', 'seq', 'txt'}
 
-# ---------- Helper Functions ----------
+# ---------- More Helpers ----------
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -124,13 +132,6 @@ def has_enough_space(file_storage_list, target_dir):
         return True, total_size
     else:
         return False, total_size - free
-
-def human_readable_size(size_bytes):
-    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
-        if size_bytes < 1024.0:
-            return f"{size_bytes:.1f} {unit}"
-        size_bytes /= 1024.0
-    return f"{size_bytes:.1f} PB"
 
 def is_tool_available(tool_name):
     try:
@@ -417,12 +418,10 @@ def sanger_assemble():
             window_size=window_size
         )
 
-        # Filter contigs and compute all_unused for the template
+        # Filter contigs
         filtered_contigs = [c for c in result['all_contigs'] if c['reads_used'] > 1]
         extra_unused = [read for ctg in result['all_contigs'] if ctg['reads_used'] <= 1 for read in ctg['read_names']]
         all_unused = result.get('unused_reads', []) + extra_unused
-
-        # Find max reads_used for progress bar
         max_reads = max((c['reads_used'] for c in filtered_contigs), default=1)
 
         result_path = os.path.join(results_dir, 'result.json')
@@ -577,7 +576,6 @@ def view_results(run_id):
         try:
             with open(result_json) as f:
                 result = json.load(f)
-            # We also need to pass filtered_contigs etc. when viewing from History
             filtered_contigs = [c for c in result['all_contigs'] if c['reads_used'] > 1]
             extra_unused = [read for ctg in result['all_contigs'] if ctg['reads_used'] <= 1 for read in ctg['read_names']]
             all_unused = result.get('unused_reads', []) + extra_unused
