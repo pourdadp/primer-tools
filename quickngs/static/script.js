@@ -202,11 +202,14 @@ function buildSangerForm(files) {
                 ${!refProvided ? `
                 <div class="mb-2">
                     <label class="form-label small fw-bold mb-1">🧠 Assembly Algorithm</label>
-                    <select class="form-select form-select-sm" name="algorithm">
+                    <select class="form-select form-select-sm" name="algorithm" id="algorithmSelect">
                         <option value="greedy">Greedy OLC (Fast)</option>
                         <option value="alignment">Semi‑Global Alignment (Precise)</option>
                         <option value="debruijn">De Bruijn Graph</option>
                     </select>
+                    <div id="debruijnWarning" class="alert alert-warning py-2 px-2 small mt-2" style="display:none;">
+                        <strong>⚠️ Note:</strong> De Bruijn Graph is optimized for <em>short NGS reads</em>. For Sanger data, <strong>Greedy</strong> or <strong>Semi‑Global</strong> may produce longer, more accurate contigs.
+                    </div>
                 </div>` : ''}
             </div>
         </div>
@@ -218,8 +221,24 @@ function buildSangerForm(files) {
             document.getElementById('qualityParams').style.display = this.checked ? 'flex' : 'none';
         });
     }
+
+    // De Bruijn warning toggle
+    const algoSelect = document.getElementById('algorithmSelect');
+    const warningDiv = document.getElementById('debruijnWarning');
+
+    function toggleDebruijnWarning() {
+        if (algoSelect && warningDiv) {
+            warningDiv.style.display = algoSelect.value === 'debruijn' ? 'block' : 'none';
+        }
+    }
+
+    if (algoSelect) {
+        algoSelect.addEventListener('change', toggleDebruijnWarning);
+        toggleDebruijnWarning();
+    }
 }
 
+// ---------- Form submission handling ----------
 document.getElementById('smartForm').addEventListener('submit', function(e) {
     e.preventDefault();
     if (!detectedMode) return;
@@ -244,7 +263,21 @@ document.getElementById('smartForm').addEventListener('submit', function(e) {
     document.getElementById('progress_section').scrollIntoView({ behavior: 'smooth' });
     
     fetch(endpoint, { method: 'POST', body: formData })
-    .then(response => response.text())
-    .then(html => { document.open(); document.write(html); document.close(); })
-    .catch(err => alert('Error: ' + err));
+    .then(response => {
+        if (response.headers.get('content-type') && response.headers.get('content-type').includes('application/json')) {
+            return response.json().then(data => {
+                throw new Error(data.message || 'Server error');
+            });
+        }
+        return response.text();
+    })
+    .then(html => {
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        window.location.href = url;
+    })
+    .catch(err => {
+        alert('Error: ' + err.message);
+        document.getElementById('progress_section').style.display = 'none';
+    });
 });
