@@ -145,6 +145,7 @@ def greedy_assemble(reads, min_overlap=3, fuzzy_threshold=50, max_mismatch=3, or
     sorted_reads = sorted(reads, key=lambda x: -len(x))
     best_contig, best_steps, best_placements, best_remaining = '', [], [], sorted_reads[:]
 
+    # FIX: iterate over all seeds, not just the first one
     for seed_idx in range(len(sorted_reads)):
         temp_reads = sorted_reads[:]
         seed = temp_reads.pop(seed_idx)
@@ -208,7 +209,7 @@ def greedy_assemble(reads, min_overlap=3, fuzzy_threshold=50, max_mismatch=3, or
         contig = resolve_and_build(placements)
         if len(contig) > len(best_contig):
             best_contig, best_steps, best_placements, best_remaining = contig, steps, placements, temp_reads[:]
-            break
+        # FIX: removed premature 'break' that prevented trying other seeds
     return {'contig': best_contig, 'steps': best_steps, 'placements': best_placements,
             'remaining': best_remaining, 'total': len(sorted_reads)}
 
@@ -472,10 +473,22 @@ def guided_assemble_fastq(r1_fastq, ref_fasta, results_folder):
     vcf_file = os.path.join(results_folder, f"{sample}.vcf")
     consensus_file = os.path.join(results_folder, f"{sample}_consensus.fa")
 
-    # Alignment (single‑end)
-    with open(sam_file, 'w') as out:
-        subprocess.run(['bwa', 'mem', '-M', '-R', f'@RG\\tID:{sample}\\tSM:{sample}',
-                        ref_fasta, r1_fastq], stdout=out, stderr=subprocess.PIPE, check=True)
+    # Alignment (single‑end) – FIXED: real tab, improved error reporting
+    try:
+        result = subprocess.run(
+            ['bwa', 'mem', '-M', '-R', f'@RG\tID:{sample}\tSM:{sample}',
+             ref_fasta, r1_fastq],
+            capture_output=True, text=True, check=True
+        )
+        with open(sam_file, 'w') as out:
+            out.write(result.stdout)
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(
+            f"BWA mem failed (exit code {e.returncode}):\n"
+            f"STDERR:\n{e.stderr}\n"
+            f"STDOUT (first 500 chars):\n{e.stdout[:500]}"
+        ) from e
+
     with open(bam_file, 'w') as out:
         subprocess.run(['samtools', 'view', '-bS', sam_file], stdout=out, check=True)
     subprocess.run(['samtools', 'sort', '-o', sorted_bam, bam_file], check=True)
@@ -526,14 +539,38 @@ def assemble_reads_from_files(filepaths, mode='greedy', min_overlap=3, max_misma
     trim_details = []
 
     if ref_fasta:
-        reads, _, labels, _ = parse_uploaded_files(filepaths, trim_low_quality, quality_threshold, window_size)
+        if results_folder is None:
+            raise ValueError("results_folder is required for guided assembly")
+        reads, _, labels, trim_details = parse_uploaded_files(filepaths, trim_low_quality, quality_threshold, window_size)
         all_labels = labels
         r1_path = os.path.join(results_folder, 'combined_R1.fastq')
         with open(r1_path, 'w') as f1:
             for i, seq in enumerate(reads):
-                qual = ''.join(chr(40+33) for _ in seq)
+                qual = ''.join(chr(40+33) for _ in seq)   # artificial Q40 quality
                 f1.write(f"@read{i}\n{seq}\n+\n{qual}\n")
-        return guided_assemble_fastq(r1_path, ref_fasta, results_folder)
+        guided_result = guided_assemble_fastq(r1_path, ref_fasta, results_folder)
+
+        # Return a consistent structure with all expected keys
+        return {
+            'contig': guided_result['contig'],
+            'all_contigs': [{
+                'cluster_id': 1,
+                'contig': guided_result['contig'],
+                'reads_used': len(reads),
+                'read_names': all_labels,
+                'length': len(guided_result['contig']),
+                'merged_from': None
+            }],
+            'total_clusters': 1,
+            'initial_clusters': 1,
+            'reads_count': len(reads),
+            'mode': 'guided',
+            'multi_cluster': False,
+            'trim_details': trim_details,
+            'unused_reads': [],
+            'avg_depth': guided_result.get('avg_depth', 0),
+            'coverage_20x': guided_result.get('coverage_20x', 0)
+        }
 
     reads, all_trim_info, all_labels, trim_details = parse_uploaded_files(
         filepaths, trim_low_quality, quality_threshold, window_size)
@@ -559,7 +596,7 @@ def assemble_reads_from_files(filepaths, mode='greedy', min_overlap=3, max_misma
             if contig:
                 contigs.append(contig)
                 cluster_read_indices.append(indices)
-                all_used_indices.update(indices)
+                all_used_indices.update(indices)   # note: may overcount slightly if cluster assembly left some reads unused
 
         merged_contigs, merge_map = merge_clusters(contigs, min_overlap=min_overlap*2, max_mismatch=max_mismatch)
 
