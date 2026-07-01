@@ -2,6 +2,8 @@
 """
 QuickNGS – From FASTQ/AB1 to clinical report or assembled contig.
 Real NGS pipeline (BWA + Samtools + FreeBayes + SnpEff) + De Novo / Guided Assembly.
+Includes Translation (5 methods, 6 genetic codes), BLAST (NCBI Web + Local), MSA (MUSCLE + Biopython),
+PDF report generation, logging, and smart storage management.
 Powered by Pourdad Panahi – Built with DeepSeek AI
 """
 
@@ -20,7 +22,7 @@ from werkzeug.utils import secure_filename
 from logger import setup_logger
 logger = setup_logger()
 
-# ---------- Helper Functions ----------
+# ---------- Helper Functions (must be defined early) ----------
 def human_readable_size(size_bytes):
     for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
         if size_bytes < 1024.0:
@@ -35,6 +37,7 @@ def get_free_space(path='/'):
     except OSError:
         return 0
 
+# ---------- Smart Storage Management ----------
 def find_best_storage():
     root_free = get_free_space('/')
     if root_free > 2 * 1024 * 1024 * 1024:
@@ -101,6 +104,7 @@ app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024 * 1024  # 10 GB
 
 ALLOWED_EXTENSIONS = {'fastq', 'fq', 'gz', 'fasta', 'fa', 'fna', 'ab1', 'seq', 'txt'}
 
+# ---------- More Helpers ----------
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -369,11 +373,7 @@ def run_pipeline(config_path, results_folder):
         update_status(results_folder, "Error", 0, str(e))
         logger.error(f"NGS Pipeline Error: {str(e)}")
 
-# ========== ROUTES ==========
-@app.route('/')
-def index():
-    return render_template('index.html')
-
+# ---------- Assembly routes ----------
 @app.route('/sanger_assemble', methods=['POST'])
 def sanger_assemble():
     files = request.files.getlist('seq_files')
@@ -402,6 +402,9 @@ def sanger_assemble():
     results_dir = os.path.join(RESULTS_FOLDER, run_id)
     os.makedirs(results_dir, exist_ok=True)
 
+    # Create initial status file for History
+    update_status(results_dir, "Starting Assembly", 0, "Initializing Sanger assembly...")
+
     filepaths = []
     for file in files:
         fpath = os.path.join(results_dir, secure_filename(file.filename))
@@ -428,6 +431,9 @@ def sanger_assemble():
         with open(result_path, 'w') as f:
             json.dump(result, f)
 
+        # Update status to Completed
+        update_status(results_dir, "Completed", 100, "Assembly finished.")
+
         logger.info(f"Sanger assembly completed: {run_id}")
         return render_template('assemble_result.html',
                                result=result,
@@ -437,12 +443,15 @@ def sanger_assemble():
                                filename=files[0].filename,
                                run_id=run_id)
     except ValueError as e:
+        update_status(results_dir, "Error", 0, str(e))
         logger.error(f"Sanger Assembly Error: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 400
     except RuntimeError as e:
+        update_status(results_dir, "Error", 0, str(e))
         logger.error(f"Sanger Assembly Error: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
     except Exception as e:
+        update_status(results_dir, "Error", 0, f"Unexpected: {str(e)}")
         logger.error(f"Sanger Assembly Error: {str(e)}")
         return jsonify({"status": "error", "message": f"Unexpected error: {str(e)}"}), 500
 
@@ -467,6 +476,9 @@ def assemble_guided():
     run_id = f"{project_name}_{int(time.time())}"
     results_dir = os.path.join(RESULTS_FOLDER, run_id)
     os.makedirs(results_dir, exist_ok=True)
+
+    # Create initial status file for History
+    update_status(results_dir, "Starting Guided Assembly", 0, "Initializing guided assembly...")
 
     ref_path = os.path.join(results_dir, secure_filename(ref_file.filename))
     ref_file.save(ref_path)
@@ -496,6 +508,9 @@ def assemble_guided():
         with open(result_path, 'w') as f:
             json.dump(result, f)
 
+        # Update status to Completed
+        update_status(results_dir, "Completed", 100, "Guided assembly finished.")
+
         logger.info(f"Guided assembly completed: {run_id}")
         return render_template('assemble_result.html',
                                result=result,
@@ -505,11 +520,18 @@ def assemble_guided():
                                filename=files[0].filename,
                                run_id=run_id)
     except RuntimeError as e:
+        update_status(results_dir, "Error", 0, str(e))
         logger.error(f"Guided Assembly Error: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
     except Exception as e:
+        update_status(results_dir, "Error", 0, f"Unexpected: {str(e)}")
         logger.error(f"Guided Assembly Error: {str(e)}")
         return jsonify({"status": "error", "message": f"Unexpected error: {str(e)}"}), 500
+
+# ---------- Standard Routes ----------
+@app.route('/')
+def index():
+    return render_template('index.html')
 
 @app.route('/start_ngs', methods=['POST'])
 def start_ngs():
@@ -522,6 +544,9 @@ def start_ngs():
     run_id = f"{sample_name}_{int(time.time())}"
     results_dir = os.path.join(RESULTS_FOLDER, run_id)
     os.makedirs(results_dir, exist_ok=True)
+
+    # Create initial status file for History
+    update_status(results_dir, "Starting NGS", 0, "Initializing NGS pipeline...")
 
     r1.save(os.path.join(results_dir, secure_filename(r1.filename)))
     r2.save(os.path.join(results_dir, secure_filename(r2.filename)))
@@ -567,12 +592,13 @@ def view_results(run_id):
     result_json = os.path.join(RESULTS_FOLDER, run_id, 'result.json')
     report_json = os.path.join(RESULTS_FOLDER, run_id, 'report.json')
 
-    # اولویت با Sanger (result.json)
+    # First check for Sanger result
     if os.path.exists(result_json):
         try:
             with open(result_json) as f:
                 result = json.load(f)
 
+            # Compute filtered contigs etc.
             filtered_contigs = [c for c in result['all_contigs'] if c['reads_used'] > 1]
             extra_unused = [read for ctg in result['all_contigs'] if ctg['reads_used'] <= 1 for read in ctg['read_names']]
             all_unused = result.get('unused_reads', []) + extra_unused
@@ -588,7 +614,7 @@ def view_results(run_id):
             logger.error(f"Error loading Sanger result from History: {str(e)}")
             return f"Error reading Sanger result: {str(e)}", 500
 
-    # سپس NGS (report.json)
+    # Then check for NGS result
     if os.path.exists(report_json):
         try:
             with open(report_json) as f:
@@ -625,6 +651,7 @@ def download_file(run_id, filename):
         return send_file(file_path, as_attachment=True)
     return jsonify({"status": "error", "message": "File not found."}), 404
 
+# ---------- Delete run ----------
 @app.route('/delete/<run_id>', methods=['DELETE'])
 def delete_run(run_id):
     run_dir = os.path.join(RESULTS_FOLDER, run_id)
@@ -636,6 +663,7 @@ def delete_run(run_id):
             return jsonify({"status": "error", "message": str(e)}), 500
     return jsonify({"status": "error", "message": "Run not found."}), 404
 
+# ---------- Translation endpoint ----------
 @app.route('/translate', methods=['POST'])
 def translate_sequence():
     data = request.get_json()
@@ -651,6 +679,7 @@ def translate_sequence():
     result = translate_contig(seq, ref_protein, method, genetic_code)
     return jsonify(result)
 
+# ---------- BLAST endpoint ----------
 @app.route('/blast', methods=['POST'])
 def blast_sequence():
     data = request.get_json()
@@ -668,6 +697,7 @@ def blast_sequence():
     result = run_blast(seq, mode, db, program, evalue, max_hits)
     return jsonify(result)
 
+# ---------- MSA endpoint ----------
 @app.route('/msa', methods=['POST'])
 def msa_align():
     data = request.get_json()
@@ -690,6 +720,7 @@ def msa_align():
     
     return jsonify(result)
 
+# ---------- PDF Report Route ----------
 @app.route('/report_pdf/<run_id>')
 def report_pdf(run_id):
     try:
@@ -731,6 +762,7 @@ def report_pdf(run_id):
     response.headers['Content-Disposition'] = f'attachment; filename=QuickNGS_report_{run_id}.pdf'
     return response
 
+# ---------- Log Viewer ----------
 @app.route('/log')
 def view_log():
     log_path = 'app.log'
@@ -740,6 +772,7 @@ def view_log():
         content = f.read()
     return f"<pre style='white-space: pre-wrap; padding: 10px;'>{content}</pre>"
 
+# ---------- Info Pages ----------
 @app.route('/about')
 def about_page():
     return render_template('about.html')
