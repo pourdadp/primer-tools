@@ -145,7 +145,7 @@ def greedy_assemble(reads, min_overlap=3, fuzzy_threshold=50, max_mismatch=3, or
     sorted_reads = sorted(reads, key=lambda x: -len(x))
     best_contig, best_steps, best_placements, best_remaining = '', [], [], sorted_reads[:]
 
-    # FIX: iterate over all seeds, not just the first one
+    # iterate over all seeds to find the best assembly
     for seed_idx in range(len(sorted_reads)):
         temp_reads = sorted_reads[:]
         seed = temp_reads.pop(seed_idx)
@@ -209,7 +209,7 @@ def greedy_assemble(reads, min_overlap=3, fuzzy_threshold=50, max_mismatch=3, or
         contig = resolve_and_build(placements)
         if len(contig) > len(best_contig):
             best_contig, best_steps, best_placements, best_remaining = contig, steps, placements, temp_reads[:]
-        # FIX: removed premature 'break' that prevented trying other seeds
+        # continue loop to try other seeds; no break here
     return {'contig': best_contig, 'steps': best_steps, 'placements': best_placements,
             'remaining': best_remaining, 'total': len(sorted_reads)}
 
@@ -473,10 +473,10 @@ def guided_assemble_fastq(r1_fastq, ref_fasta, results_folder):
     vcf_file = os.path.join(results_folder, f"{sample}.vcf")
     consensus_file = os.path.join(results_folder, f"{sample}_consensus.fa")
 
-    # Alignment (single‑end) – FIXED: real tab, improved error reporting
+    # Alignment (single‑end) – using escaped tabs as required by newer BWA
     try:
         result = subprocess.run(
-            ['bwa', 'mem', '-M', '-R', f'@RG\tID:{sample}\tSM:{sample}',
+            ['bwa', 'mem', '-M', '-R', f'@RG\\tID:{sample}\\tSM:{sample}',
              ref_fasta, r1_fastq],
             capture_output=True, text=True, check=True
         )
@@ -596,7 +596,7 @@ def assemble_reads_from_files(filepaths, mode='greedy', min_overlap=3, max_misma
             if contig:
                 contigs.append(contig)
                 cluster_read_indices.append(indices)
-                all_used_indices.update(indices)   # note: may overcount slightly if cluster assembly left some reads unused
+                all_used_indices.update(indices)
 
         merged_contigs, merge_map = merge_clusters(contigs, min_overlap=min_overlap*2, max_mismatch=max_mismatch)
 
