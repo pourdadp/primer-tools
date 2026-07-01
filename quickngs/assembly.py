@@ -305,10 +305,9 @@ def debruijn_assemble(reads, k=3):
     if not reads:
         return ''
 
-    # Calculate average read length for quality threshold
     avg_read_len = sum(len(r) for r in reads) / len(reads)
 
-    for attempt in range(3):  # Try up to 3 times with increasing k
+    for attempt in range(3):
         graph = {}
         for read in reads:
             for i in range(len(read) - k + 1):
@@ -320,12 +319,11 @@ def debruijn_assemble(reads, k=3):
         if not graph:
             return ''
 
-        # Start from the most connected node to improve assembly
         start = max(graph.keys(), key=lambda x: len(graph[x]))
         contig = start
         current = start
         visited_edges = set()
-        max_contig_length = 100000  # safety limit
+        max_contig_length = 100000
 
         while current in graph and graph[current]:
             if len(contig) > max_contig_length:
@@ -338,14 +336,12 @@ def debruijn_assemble(reads, k=3):
             contig += next_node[-1]
             current = next_node
 
-        # If contig is sufficiently long or k is already high, return it
         if len(contig) >= avg_read_len * 1.5 or k >= 7:
             return contig
 
-        # Otherwise, increase k and try again
         k += 2
 
-    return contig  # Return the last attempt
+    return contig
 
 # ---------- Intelligent Clustering ----------
 def cluster_reads(reads, min_overlap=3, max_mismatch=3):
