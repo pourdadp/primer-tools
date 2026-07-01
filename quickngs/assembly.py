@@ -300,42 +300,52 @@ def assemble_with_alignment(reads, min_overlap=3, orientation='auto'):
                 break
     return contig
 
-# ---------- De Bruijn Graph (Fixed: cycle detection + max length) ----------
+# ---------- De Bruijn Graph (Fixed: cycle detection, max length, auto k) ----------
 def debruijn_assemble(reads, k=3):
     if not reads:
         return ''
-    graph = {}
-    for read in reads:
-        for i in range(len(read) - k + 1):
-            kmer = read[i:i+k]
-            prefix = kmer[:-1]
-            suffix = kmer[1:]
-            graph.setdefault(prefix, []).append(suffix)
 
-    if not graph:
-        return ''
+    # Calculate average read length for quality threshold
+    avg_read_len = sum(len(r) for r in reads) / len(reads)
 
-    # Start from the most connected node to improve assembly
-    start = max(graph.keys(), key=lambda x: len(graph[x]))
-    contig = start
-    current = start
-    visited_edges = set()
-    max_contig_length = 100000  # safety limit
+    for attempt in range(3):  # Try up to 3 times with increasing k
+        graph = {}
+        for read in reads:
+            for i in range(len(read) - k + 1):
+                kmer = read[i:i+k]
+                prefix = kmer[:-1]
+                suffix = kmer[1:]
+                graph.setdefault(prefix, []).append(suffix)
 
-    while current in graph and graph[current]:
-        if len(contig) > max_contig_length:
-            break
+        if not graph:
+            return ''
 
-        next_node = graph[current].pop(0)
-        edge = (current, next_node)
-        if edge in visited_edges:
-            break
-        visited_edges.add(edge)
+        # Start from the most connected node to improve assembly
+        start = max(graph.keys(), key=lambda x: len(graph[x]))
+        contig = start
+        current = start
+        visited_edges = set()
+        max_contig_length = 100000  # safety limit
 
-        contig += next_node[-1]
-        current = next_node
+        while current in graph and graph[current]:
+            if len(contig) > max_contig_length:
+                break
+            next_node = graph[current].pop(0)
+            edge = (current, next_node)
+            if edge in visited_edges:
+                break
+            visited_edges.add(edge)
+            contig += next_node[-1]
+            current = next_node
 
-    return contig
+        # If contig is sufficiently long or k is already high, return it
+        if len(contig) >= avg_read_len * 1.5 or k >= 7:
+            return contig
+
+        # Otherwise, increase k and try again
+        k += 2
+
+    return contig  # Return the last attempt
 
 # ---------- Intelligent Clustering ----------
 def cluster_reads(reads, min_overlap=3, max_mismatch=3):
