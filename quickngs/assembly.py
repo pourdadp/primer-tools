@@ -304,9 +304,7 @@ def assemble_with_alignment(reads, min_overlap=3, orientation='auto'):
 def debruijn_assemble(reads, k=3):
     if not reads:
         return ''
-
     avg_read_len = sum(len(r) for r in reads) / len(reads)
-
     for attempt in range(3):
         graph = {}
         for read in reads:
@@ -315,16 +313,13 @@ def debruijn_assemble(reads, k=3):
                 prefix = kmer[:-1]
                 suffix = kmer[1:]
                 graph.setdefault(prefix, []).append(suffix)
-
         if not graph:
             return ''
-
         start = max(graph.keys(), key=lambda x: len(graph[x]))
         contig = start
         current = start
         visited_edges = set()
         max_contig_length = 100000
-
         while current in graph and graph[current]:
             if len(contig) > max_contig_length:
                 break
@@ -335,12 +330,9 @@ def debruijn_assemble(reads, k=3):
             visited_edges.add(edge)
             contig += next_node[-1]
             current = next_node
-
         if len(contig) >= avg_read_len * 1.5 or k >= 7:
             return contig
-
         k += 2
-
     return contig
 
 # ---------- Intelligent Clustering ----------
@@ -435,7 +427,7 @@ def merge_clusters(contigs, min_overlap=10, max_mismatch=0):
                 break
     return merged, final_merge_map
 
-# ---------- Guided Assembly (with reference validation) ----------
+# ---------- Guided Assembly (with bcftools mpileup) ----------
 def guided_assemble_fastq(r1_fastq, ref_fasta, results_folder):
     for tool in ['bwa', 'samtools', 'bcftools']:
         if not is_tool_available(tool):
@@ -477,27 +469,34 @@ def guided_assemble_fastq(r1_fastq, ref_fasta, results_folder):
     bam_file = os.path.join(results_folder, f"{sample}.bam")
     sorted_bam = os.path.join(results_folder, f"{sample}.sorted.bam")
 
+    # Alignment (single-end)
     with open(sam_file, 'w') as out:
         subprocess.run(['bwa', 'mem', '-M', '-R', f'@RG\\tID:{sample}\\tSM:{sample}',
                         ref_fasta, r1_fastq], stdout=out, stderr=subprocess.PIPE, check=True)
-
     with open(bam_file, 'w') as out:
         subprocess.run(['samtools', 'view', '-bS', sam_file], stdout=out, check=True)
     subprocess.run(['samtools', 'sort', '-o', sorted_bam, bam_file], check=True)
     subprocess.run(['samtools', 'index', sorted_bam], check=True)
 
+    # Variant calling and consensus using bcftools mpileup (compatible with newer versions)
+    bcf_file = os.path.join(results_folder, f"{sample}.bcf")
     consensus_file = os.path.join(results_folder, f"{sample}_consensus.fa")
-    with open(consensus_file, 'w') as out:
-        p1 = subprocess.run(['samtools', 'mpileup', '-uf', ref_fasta, sorted_bam],
-                            capture_output=True, text=True)
-        if p1.returncode != 0:
-            raise RuntimeError(f"samtools mpileup failed: {p1.stderr.strip()}")
-        p2 = subprocess.run(['bcftools', 'call', '-c'], input=p1.stdout, capture_output=True, text=True)
+
+    # mpileup: generate BCF (uncompressed) via bcftools
+    with open(bcf_file, 'w') as bcf_out:
+        p1 = subprocess.run(['bcftools', 'mpileup', '-Ou', '-f', ref_fasta, sorted_bam],
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        # call variants (consensus caller)
+        p2 = subprocess.run(['bcftools', 'call', '-c', '-o', bcf_file],
+                            input=p1.stdout, stderr=subprocess.PIPE, check=False)
         if p2.returncode != 0:
-            raise RuntimeError(f"bcftools call failed: {p2.stderr.strip()}")
-        p3 = subprocess.run(['bcftools', 'consensus', '-f', ref_fasta], input=p2.stdout, stdout=out, text=True)
-        if p3.returncode != 0:
-            raise RuntimeError(f"bcftools consensus failed: {p3.stderr.strip()}")
+            # fallback: write to stdout and redirect
+            with open(bcf_file, 'wb') as f:
+                subprocess.run(['bcftools', 'call', '-c'], input=p1.stdout, stdout=f, check=True)
+
+    # Generate consensus from BCF
+    with open(consensus_file, 'w') as out:
+        subprocess.run(['bcftools', 'consensus', '-f', ref_fasta, bcf_file], stdout=out, check=True)
 
     with open(consensus_file) as f:
         contig = f.read().strip()
