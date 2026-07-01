@@ -300,7 +300,7 @@ def assemble_with_alignment(reads, min_overlap=3, orientation='auto'):
                 break
     return contig
 
-# ---------- De Bruijn Graph ----------
+# ---------- De Bruijn Graph (Fixed: cycle detection + max length) ----------
 def debruijn_assemble(reads, k=3):
     if not reads:
         return ''
@@ -311,15 +311,30 @@ def debruijn_assemble(reads, k=3):
             prefix = kmer[:-1]
             suffix = kmer[1:]
             graph.setdefault(prefix, []).append(suffix)
+
     if not graph:
         return ''
-    start = list(graph.keys())[0]
+
+    # Start from the most connected node to improve assembly
+    start = max(graph.keys(), key=lambda x: len(graph[x]))
     contig = start
     current = start
+    visited_edges = set()
+    max_contig_length = 100000  # safety limit
+
     while current in graph and graph[current]:
+        if len(contig) > max_contig_length:
+            break
+
         next_node = graph[current].pop(0)
+        edge = (current, next_node)
+        if edge in visited_edges:
+            break
+        visited_edges.add(edge)
+
         contig += next_node[-1]
         current = next_node
+
     return contig
 
 # ---------- Intelligent Clustering ----------
@@ -519,11 +534,8 @@ def assemble_reads_from_files(filepaths, mode='greedy', min_overlap=3, max_misma
     reads, all_trim_info, all_labels, trim_details = parse_uploaded_files(
         filepaths, trim_low_quality, quality_threshold, window_size)
 
-    # Build index → label mapping
     idx_to_label = {i: label for i, label in enumerate(all_labels)}
-
     clusters = cluster_reads(reads, min_overlap, max_mismatch)
-
     all_used_indices = set()
 
     if len(clusters) > 1:
@@ -591,38 +603,6 @@ def assemble_reads_from_files(filepaths, mode='greedy', min_overlap=3, max_misma
             res = {'contig': contig, 'k': k, 'reads_count': len(reads)}
         else:
             res = {'error': 'Unknown mode'}
-
-        # Determine unused reads using the same index‑to‑label mapping
-        unused_labels = []
-        if 'remaining' in res and res['remaining']:
-            remaining_seqs = res['remaining']
-            # Build reverse map from sequence to list of indices
-            seq_to_indices = {}
-            for idx, seq in enumerate(reads):
-                seq_to_indices.setdefault(seq, []).append(idx)
-            used_for_remaining = set()
-            for seq in remaining_seqs:
-                if seq in seq_to_indices:
-                    for i in seq_to_indices[seq]:
-                        if i not in used_for_remaining:
-                            used_for_remaining.add(i)
-                            break
-            unused_labels = [idx_to_label[i] for i in range(len(reads)) if i not in used_for_remaining]
-        elif 'steps' in res and res['steps']:
-            used_indices = set()
-            for step in res['steps']:
-                if 'seq' in step:
-                    seq = step['seq']
-                    if seq in reads:
-                        # find first occurrence not yet marked
-                        for idx, s in enumerate(reads):
-                            if s == seq and idx not in used_indices:
-                                used_indices.add(idx)
-                                break
-            all_used_indices = used_indices
-            unused_indices = [i for i in range(len(reads)) if i not in all_used_indices]
-            unused_labels = [idx_to_label[i] for i in unused_indices]
-
         res['reads_count'] = len(reads)
         res['multi_cluster'] = False
         res['all_contigs'] = [{'cluster_id': 1, 'contig': res['contig'], 'reads_used': len(reads),
@@ -631,6 +611,5 @@ def assemble_reads_from_files(filepaths, mode='greedy', min_overlap=3, max_misma
         res['total_clusters'] = 1
         res['trim_info'] = all_trim_info
         res['trim_details'] = trim_details
-        res['unused_reads'] = unused_labels
-
+        res['unused_reads'] = []
         return res
