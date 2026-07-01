@@ -40,7 +40,7 @@ def trim_by_quality(seq, qualities, threshold=20, window=5):
             break
     return seq[start:end], qualities[start:end]
 
-# ---------- File parsing ----------
+# ---------- File parsing (now returns labels) ----------
 def parse_uploaded_file(filepath, trim_low_quality=False, quality_threshold=20, window_size=5):
     filename = os.path.basename(filepath)
     sequences = []
@@ -66,7 +66,7 @@ def parse_uploaded_file(filepath, trim_low_quality=False, quality_threshold=20, 
                     labels.append(f"{filename} (seq {i+1})")
                 else:
                     labels.append(filename)
-        else:
+        else:  # plain text / .seq / .txt
             with open(filepath, 'r') as f:
                 lines = [line.strip() for line in f if line.strip()]
                 if lines and lines[0].startswith('>'):
