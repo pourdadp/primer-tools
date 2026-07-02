@@ -1,0 +1,228 @@
+<!-- templates/report_pdf.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>QuickNGS Report - {{ run_id }}</title>
+    <style>
+        /* A4 page setup */
+        @page {
+            size: A4;
+            margin: 1.5cm;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 10pt;
+            line-height: 1.4;
+            color: #222;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .report-container {
+            width: 100%;
+            max-width: 17cm;
+            margin: 0 auto;
+        }
+        
+        .report-header {
+            text-align: center;
+            border-bottom: 2px solid #198754;
+            padding-bottom: 0.5cm;
+            margin-bottom: 0.8cm;
+        }
+        
+        .report-header h2 {
+            color: #198754;
+            margin: 0 0 0.2cm 0;
+            font-size: 18pt;
+        }
+        
+        .report-header .meta {
+            font-size: 9pt;
+            color: #555;
+        }
+        
+        h3 {
+            font-size: 13pt;
+            color: #198754;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 0.1cm;
+            margin-top: 0.5cm;
+            margin-bottom: 0.3cm;
+        }
+        
+        h4 {
+            font-size: 11pt;
+            color: #333;
+            margin-top: 0.4cm;
+            margin-bottom: 0.2cm;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0.3cm 0 0.5cm 0;
+            font-size: 9pt;
+        }
+        
+        th, td {
+            border: 1px solid #bbb;
+            padding: 4px 6px;
+            text-align: left;
+            vertical-align: top;
+        }
+        
+        th {
+            background-color: #e9ecef;
+            font-weight: 600;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 4px;
+            color: white;
+            font-size: 8pt;
+            font-weight: bold;
+        }
+        
+        .bg-secondary { background-color: #6c757d; }
+        .bg-danger { background-color: #dc3545; }
+        .bg-warning { background-color: #e5a910; color: #222; }
+        
+        .sequence-block {
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            padding: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 8pt;
+            word-break: break-all;
+            white-space: pre-wrap;
+            max-height: 150px;
+            overflow-y: auto;
+            margin: 0.2cm 0;
+        }
+        
+        .contig-card {
+            page-break-inside: avoid;
+            margin-bottom: 0.3cm;
+            border: 1px solid #ddd;
+            padding: 0.2cm;
+            border-radius: 4px;
+        }
+        
+        .report-footer {
+            margin-top: 0.8cm;
+            padding-top: 0.4cm;
+            border-top: 1px solid #ccc;
+            text-align: center;
+            font-size: 8pt;
+            color: #777;
+        }
+        
+        .note {
+            font-style: italic;
+            color: #555;
+            font-size: 9pt;
+        }
+    </style>
+</head>
+<body>
+    <div class="report-container">
+        
+        <!-- Header -->
+        <div class="report-header">
+            <h2>🧬 QuickNGS Analysis Report</h2>
+            <div class="meta">
+                <strong>Run ID:</strong> {{ run_id }} &nbsp;|&nbsp; 
+                <strong>Date:</strong> {{ timestamp }}
+            </div>
+        </div>
+        
+        {% if mode == 'ngs' %}
+            <!-- NGS Report -->
+            <h3>NGS Pipeline Results</h3>
+            <p><strong>Sample:</strong> {{ report.sample_name }} &nbsp;|&nbsp; 
+               <strong>Reference:</strong> {{ report.reference }}</p>
+            <p>
+                <strong>Average Depth:</strong> {{ report.average_depth }}x &nbsp;|&nbsp; 
+                <strong>Coverage ≥20x:</strong> {{ report.coverage_20x }}% &nbsp;|&nbsp; 
+                <strong>Total Variants:</strong> {{ report.total_variants }}
+            </p>
+            
+            {% if variants %}
+            <h4>Variant Table</h4>
+            <table>
+                <thead><tr><th>Chr</th><th>Position</th><th>Ref</th><th>Alt</th><th>Gene</th><th>Impact</th></tr></thead>
+                <tbody>
+                {% for v in variants %}
+                    <tr>
+                        <td>{{ v.chr }}</td>
+                        <td>{{ v.pos }}</td>
+                        <td><span class="badge bg-secondary">{{ v.ref }}</span></td>
+                        <td><span class="badge bg-danger">{{ v.alt }}</span></td>
+                        <td>{{ v.gene }}</td>
+                        <td>{{ v.impact }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p>No variants found.</p>
+            {% endif %}
+            
+        {% else %}
+            <!-- Sanger Report -->
+            <h3>Sanger Assembly Results</h3>
+            <p><strong>Mode:</strong> {{ result.mode }} &nbsp;|&nbsp; 
+               <strong>Total Reads:</strong> {{ result.reads_count }}</p>
+            
+            {% if result.trim_details and result.trim_details|length > 0 %}
+            <h4>Quality Trimming Details</h4>
+            <table>
+                <thead><tr><th>File</th><th>Original (bp)</th><th>Trimmed (bp)</th><th>Removed (bp)</th><th>Removed (%)</th></tr></thead>
+                <tbody>
+                {% for td in result.trim_details %}
+                    <tr>
+                        <td>{{ td.filename }}</td>
+                        <td>{{ td.original }}</td>
+                        <td>{{ td.trimmed }}</td>
+                        <td>{{ td.removed }}</td>
+                        <td>{{ ((td.removed / td.original) * 100) | round(1) if td.original > 0 else 0 }}%</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+            
+            {% if result.all_contigs %}
+                <h4>Assembled Contigs</h4>
+                {% for ctg in result.all_contigs %}
+                    {% if ctg.reads_used > 1 %}
+                    <div class="contig-card">
+                        <p><strong>Contig {{ ctg.cluster_id }}</strong> – Length: {{ ctg.length }} bp, Reads Used: {{ ctg.reads_used }}
+                        {% if ctg.merged_from %}<span class="badge bg-warning">⚡ Merged</span>{% endif %}</p>
+                        <div class="sequence-block">{{ ctg.contig }}</div>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+                <p class="note">Note: Interactive BLAST and MSA results are available in the web application. Use the browser's Print function to include them in a report.</p>
+            {% else %}
+                <p>No contigs assembled.</p>
+            {% endif %}
+        {% endif %}
+        
+        <!-- Footer -->
+        <div class="report-footer">
+            <p>
+                <strong>QuickNGS v2.0</strong> &bull; 
+                <a href="https://github.com/pourdadp/primer-tools">github.com/pourdadp/primer-tools</a><br>
+                Powered by <strong>Pourdad Panahi</strong> – Built with DeepSeek AI
+            </p>
+        </div>
+        
+    </div>
+</body>
+</html>

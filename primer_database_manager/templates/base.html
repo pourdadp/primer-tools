@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Primer Database Manager{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body { background: #f8f9fa; }
+        .container { max-width: 1200px; }
+        .sequence { word-break: break-all; font-family: monospace; background: #f1f1f1; padding: 2px 6px; border-radius: 3px; }
+        .no-print { }
+
+        /* ===== PRINT STYLES ===== */
+        @media print {
+            .no-print { display: none !important; }
+            @page {
+                size: A4 portrait;
+                margin: 8mm 10mm;
+            }
+            body {
+                color: #000 !important;
+                font-size: 11pt !important;
+                line-height: 1.4;
+                background: #fff !important;
+            }
+            .container { max-width: 100% !important; padding: 0 !important; }
+            table { font-size: 9pt !important; color: #000 !important; border-color: #000 !important; }
+            th, td { border-color: #000 !important; color: #000 !important; padding: 4px 6px !important; }
+            .table-bordered th, .table-bordered td { border: 1px solid #000 !important; }
+            .sequence { word-break: break-all; font-family: monospace; color: #000 !important; background: #f5f5f5 !important; padding: 2px 4px; border: 1px solid #ccc; }
+            .card { border: 1px solid #000 !important; box-shadow: none !important; }
+            .card-header { background: #e0e0e0 !important; color: #000 !important; font-weight: bold !important; border-bottom: 1px solid #000 !important; }
+            .card-body { padding: 8px 12px !important; }
+            .badge { background: #666 !important; color: #fff !important; border: 1px solid #000 !important; }
+            .alert { border: 1px solid #000 !important; color: #000 !important; background: #f5f5f5 !important; }
+            ul li { color: #000 !important; }
+            .list-group-item { border-color: #000 !important; color: #000 !important; }
+            h1, h2, h3, h4, h5, h6 { color: #000 !important; }
+            footer { border-top: 1px solid #000 !important; color: #000 !important; }
+            footer a { color: #000 !important; text-decoration: underline !important; }
+        }
+
+        footer {
+            margin-top: 40px;
+            padding: 15px 0;
+            border-top: 1px solid #dee2e6;
+            font-size: 0.9rem;
+            color: #6c757d;
+            text-align: center;
+        }
+        footer a { color: #0d6efd; text-decoration: none; }
+        .navbar-brand { font-weight: bold; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark no-print">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('dashboard') }}">🧬 Primer DB</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('primer_list') }}">Primers</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('panel_list') }}">Panels</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('search') }}">Search</a></li>
+                    {% if session.get('role') == 'admin' %}
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_users') }}">Users</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_reset_requests') }}">Reset Requests</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('backup_page') }}">Backup</a></li>
+                    {% endif %}
+                </ul>
+                <ul class="navbar-nav">
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('profile') }}">👤 {{ session.username }}</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('logout') }}">Logout</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-3">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show no-print">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </div>
+
+    <footer class="no-print">
+        <div class="container">
+            <p>Primer Database Manager v1.0 – Developed by Pourdad Panahi (2025)</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const printBtn = document.querySelector('.print-btn');
+            if (printBtn) {
+                printBtn.addEventListener('click', function() {
+                    window.print();
+                });
+            }
+        });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

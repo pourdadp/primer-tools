@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Add Panel{% endblock %}
+{% block content %}
+<h2>➕ Add New Panel</h2>
+<form method="POST" class="row g-3">
+    <div class="col-md-4">
+        <label class="form-label">Panel Name *</label>
+        <input type="text" class="form-control" name="panel_name" required>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Description</label>
+        <input type="text" class="form-control" name="description">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Organism</label>
+        <input type="text" class="form-control" name="organism">
+    </div>
+    <div class="col-12">
+        <label class="form-label">Select Primers</label>
+        <select class="form-select" name="primer_ids" multiple size="5">
+            {% for p in primers %}
+            <option value="{{ p.id }}">{{ p.name }} ({{ p.gene or 'N/A' }})</option>
+            {% endfor %}
+        </select>
+        <div class="form-text">Hold Ctrl/Cmd to select multiple.</div>
+    </div>
+    <div class="col-12">
+        <button type="submit" class="btn btn-primary">Create Panel</button>
+        <a href="{{ url_for('panel_list') }}" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+{% endblock %}

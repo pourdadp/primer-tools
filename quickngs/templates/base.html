@@ -1,0 +1,43 @@
+<!-- templates/base.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}QuickNGS{% endblock %}</title>
+    
+    <!-- Bootstrap 5 CSS (Local) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap.min.css') }}">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧬</text></svg>">
+</head>
+<body>
+    
+    {% block content %}{% endblock %}
+    
+    <footer class="bg-light border-top mt-5 py-3">
+        <div class="container text-center">
+            <small class="text-muted">
+                <a href="{{ url_for('index') }}" class="text-decoration-none me-2">🏠 Home</a>
+                <a href="{{ url_for('history') }}" class="text-decoration-none me-2">📜 History</a>
+                <a href="{{ url_for('view_log') }}" class="text-decoration-none me-2">📄 Log</a>
+                <a href="{{ url_for('help_page') }}" class="text-decoration-none me-2">❓ Help</a>
+                <a href="{{ url_for('about_page') }}" class="text-decoration-none">ℹ️ About</a>
+            </small>
+            <div class="mt-1">
+                <small class="text-muted">
+                    Powered by <strong>Pourdad Panahi</strong> – Built with DeepSeek AI 
+                    <span class="badge bg-secondary">v2.0</span>
+                </small>
+            </div>
+        </div>
+    </footer>
+    
+    <!-- Bootstrap 5 JS (Local) -->
+    <script src="{{ url_for('static', filename='bootstrap.bundle.min.js') }}"></script>
+</body>
+</html>

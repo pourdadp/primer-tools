@@ -1,0 +1,342 @@
+<!-- templates/assemble_result.html -->
+{% extends "base.html" %}
+{% block title %}Assembly Result – QuickNGS{% endblock %}
+{% block content %}
+<div class="container py-3">
+    <div class="mx-auto" style="max-width: 900px;">
+        <h4 class="fw-bold">🧬 Assembly Result</h4>
+        <p class="text-muted small">
+            Mode: {{ result.mode }} | Total reads: {{ result.reads_count }}
+            {% if result.trim_details and result.trim_details|length > 0 %} | ✂️ Quality trimmed ({{ result.trim_details|length }} file(s)){% endif %}
+        </p>
+
+        {% if result.reads_count == 1 %}
+        <div class="alert alert-info py-2 px-3 small">
+            <strong>ℹ️ Only one read was uploaded.</strong><br>
+            No assembly was performed. The single read is shown below.
+        </div>
+        {% endif %}
+
+        {% if result.trim_details and result.trim_details|length > 0 %}
+        <div class="card mb-3 shadow-sm border-0">
+            <div class="card-header bg-info text-white py-2">
+                <small class="fw-bold">✂️ Quality Trimming Details</small>
+            </div>
+            <div class="card-body py-2 px-3">
+                <div class="table-responsive">
+                    <table class="table table-sm small mb-0">
+                        <thead><tr><th>File</th><th>Original (bp)</th><th>Trimmed (bp)</th><th>Removed (bp)</th><th>Removed (%)</th></tr></thead>
+                        <tbody>
+                        {% for td in result.trim_details %}
+                            <tr><td>{{ td.filename }}</td><td>{{ td.original }}</td><td>{{ td.trimmed }}</td><td>{{ td.removed }}</td><td>{{ ((td.removed / td.original) * 100) | round(1) if td.original > 0 else 0 }}%</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if all_unused and all_unused|length > 0 %}
+        <div class="alert alert-warning py-2 px-3 small">
+            <strong>⚠️ The following reads could not be assembled into any contig:</strong><br>
+            {{ all_unused|join(', ') }}
+        </div>
+        {% endif %}
+
+        {% if filtered_contigs %}
+            {% if result.initial_clusters and result.initial_clusters > 1 %}
+            <div class="alert alert-info py-2 px-3 small">
+                <strong>🔍 Why multiple contigs?</strong><br>
+                The uploaded reads formed <strong>{{ result.initial_clusters }} separate groups (clusters)</strong> 
+                because they did not have enough overlap with each other. Assembly was run on each group independently. 
+                {% if result.total_clusters < result.initial_clusters %}
+                    After merging overlapping contigs, the final number of contigs is <strong>{{ result.total_clusters }}</strong>.
+                {% else %}
+                    No further merging was possible, so each group became one contig.
+                {% endif %}
+            </div>
+            {% endif %}
+
+            {% for contig_data in filtered_contigs %}
+            <div class="card mb-3 shadow-sm">
+                <div class="card-header bg-success text-white py-2 d-flex justify-content-between align-items-center">
+                    <span>
+                        <strong>Contig {{ contig_data.cluster_id }}</strong>
+                        ({{ contig_data.length }} bp, {{ contig_data.reads_used }} reads)
+                        {% if contig_data.merged_from %}<span class="badge bg-warning text-dark ms-2">⚡ Merged</span>{% endif %}
+                    </span>
+                    <!-- Progress bar for reads_used -->
+                    <div class="progress" style="height: 8px; width: 120px;" title="{{ contig_data.reads_used }} / {{ max_reads }} reads">
+                        <div class="progress-bar bg-warning" style="width: {{ ((contig_data.reads_used / max_reads) * 100) | round }}%"></div>
+                    </div>
+                </div>
+                <div class="card-body bg-light py-2 px-3">
+                    <canvas id="graph_{{ contig_data.cluster_id }}" width="800" height="60" style="width:100%; max-height:60px;"></canvas>
+                    <pre style="font-family: monospace; white-space: pre-wrap; word-break: break-all; max-height: 150px; overflow-y: auto; margin-top: 8px;">{{ contig_data.contig }}</pre>
+                    
+                    <!-- Action Buttons with Dropdown Settings -->
+                    <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
+                        <!-- Translate -->
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-primary" onclick="translateNow({{ contig_data.cluster_id }})">🧬 Translate</button>
+                            <button class="btn btn-sm btn-primary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown"></button>
+                            <div class="dropdown-menu p-2" style="min-width:220px;">
+                                <label class="form-label small">Genetic Code</label>
+                                <select class="form-select form-select-sm mb-2" id="gencode_{{ contig_data.cluster_id }}">
+                                    <option value="1">Standard</option><option value="4">Mycoplasma</option><option value="11">Bacteria</option><option value="3">Yeast Mito</option>
+                                </select>
+                                <label class="form-label small">Method</label>
+                                <select class="form-select form-select-sm mb-2" id="method_{{ contig_data.cluster_id }}" onchange="document.getElementById('frameRow_{{ contig_data.cluster_id }}').style.display = this.value === 'manual' ? 'flex' : 'none'">
+                                    <option value="auto">Auto</option><option value="longest_orf">Longest ORF</option><option value="first_atg">First ATG</option><option value="stop_codon">Stop Codon</option><option value="codon_usage">Codon Usage</option><option value="manual">Manual</option>
+                                </select>
+                                <div id="frameRow_{{ contig_data.cluster_id }}" style="display:none; align-items:center; gap:5px;">
+                                    <label class="form-label small mb-0">Frame</label>
+                                    <select class="form-select form-select-sm" id="frame_{{ contig_data.cluster_id }}">
+                                        <option>+1</option><option>+2</option><option>+3</option><option>-1</option><option>-2</option><option>-3</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BLAST -->
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-info" onclick="blastNow({{ contig_data.cluster_id }})">🔍 BLAST</button>
+                            <button class="btn btn-sm btn-outline-info dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown"></button>
+                            <div class="dropdown-menu p-2" style="min-width:180px;">
+                                <label class="form-label small">Database</label>
+                                <select class="form-select form-select-sm mb-2" id="blast_db_{{ contig_data.cluster_id }}"><option value="nt">nt</option><option value="nr">nr</option></select>
+                                <label class="form-label small">Program</label>
+                                <select class="form-select form-select-sm mb-2" id="blast_prog_{{ contig_data.cluster_id }}"><option value="blastn">blastn</option><option value="blastx">blastx</option></select>
+                                <label class="form-label small">Max Hits</label>
+                                <select class="form-select form-select-sm" id="blast_max_{{ contig_data.cluster_id }}"><option value="10">10</option><option value="50">50</option><option value="100">100</option></select>
+                            </div>
+                        </div>
+
+                        <!-- MSA -->
+                        <button class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#msaModal_{{ contig_data.cluster_id }}">📐 MSA</button>
+
+                        <!-- Copy -->
+                        <button class="btn btn-sm btn-outline-primary" onclick="copyNow('{{ contig_data.contig }}')">📋 Copy</button>
+                    </div>
+
+                    <!-- Result Divs -->
+                    <div id="translate_result_{{ contig_data.cluster_id }}" class="mt-2"></div>
+                    <div id="blast_result_{{ contig_data.cluster_id }}" class="mt-2 w-100"></div>
+                    <div id="msa_result_{{ contig_data.cluster_id }}" class="mt-2"></div>
+                </div>
+                <div class="card-footer py-1 px-3">
+                    <small class="text-muted">Reads used: {{ contig_data.read_names|join(', ') }}</small>
+                </div>
+            </div>
+
+            <!-- MSA Modal -->
+            <div class="modal fade" id="msaModal_{{ contig_data.cluster_id }}" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header"><h6 class="modal-title">Multiple Sequence Alignment</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                        <div class="modal-body">
+                            <p class="small">Paste additional sequences in FASTA format. The contig sequence will be included automatically.</p>
+                            <textarea class="form-control form-control-sm mb-2" id="msa_seqs_{{ contig_data.cluster_id }}" rows="6" placeholder=">reference&#10;ATGCGT...&#10;>sample2&#10;ATGCGT..."></textarea>
+                            <div id="msa_result_modal_{{ contig_data.cluster_id }}"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                            <button type="button" class="btn btn-sm btn-success" onclick="msaNow({{ contig_data.cluster_id }})">Run Alignment</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="alert alert-warning">No contig assembled.</div>
+        {% endif %}
+
+        <!-- Bottom Action Bar -->
+        <div class="d-flex gap-2 mt-3 flex-wrap">
+            <button class="btn btn-sm btn-outline-dark" onclick="window.print()">🖨️ Print</button>
+            <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline-primary">🔄 New Analysis</a>
+            <a href="/report_pdf/{{ run_id }}" class="btn btn-sm btn-outline-success">📥 Download PDF</a>
+        </div>
+
+        <!-- Footer -->
+        <footer class="text-center mt-4 text-muted small">
+            <p>QuickNGS v2.0 · <a href="https://github.com/pourdadp/primer-tools" target="_blank">github.com/pourdadp/primer-tools</a></p>
+        </footer>
+    </div>
+</div>
+
+<!-- Floating Action Bar (always visible) -->
+<div class="position-fixed bottom-0 end-0 m-3 d-flex flex-column gap-2" style="z-index: 1050;">
+    <button class="btn btn-outline-success btn-sm shadow" onclick="window.location.href = window.location.origin + '/report_pdf/{{ run_id }}'">📥 PDF</button>
+    <button class="btn btn-outline-secondary btn-sm shadow" onclick="saveAllNow()">💾 Save FASTA</button>
+    <button class="btn btn-primary btn-sm shadow" onclick="copyAllNow()">📋 Copy All</button>
+</div>
+
+<script>
+var allContigs = {{ filtered_contigs|tojson }};
+
+// ---------- GRAPH ----------
+allContigs.forEach(function(ctg) {
+    var canvas = document.getElementById('graph_' + ctg.cluster_id);
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    var w = canvas.parentElement.clientWidth - 20;
+    canvas.width = w;
+    var x=10, h=30, y=15, maxW=w-20;
+    ctx.fillStyle='#e9ecef'; ctx.fillRect(x,y,maxW,h);
+    if (ctg.merged_from && ctg.merged_from.length>1) {
+        var colors=['#198754','#0d6efd','#6f42c1','#fd7e14','#d63384'];
+        var sw=maxW/ctg.merged_from.length;
+        ctg.merged_from.forEach(function(cid,i) {
+            ctx.fillStyle=colors[i%colors.length];
+            ctx.fillRect(x+i*sw,y,sw,h);
+            ctx.fillStyle='white'; ctx.font='10px sans-serif';
+            ctx.fillText('C'+cid, x+i*sw+5, y+h-8);
+        });
+    } else {
+        var intensity=Math.min(ctg.reads_used/10,1);
+        var r=Math.floor(25+(1-intensity)*200), g=Math.floor(135-(1-intensity)*100), b=Math.floor(84-(1-intensity)*50);
+        ctx.fillStyle='rgb('+r+','+g+','+b+')';
+        ctx.fillRect(x,y,maxW,h);
+        ctx.fillStyle='white'; ctx.font='10px sans-serif';
+        ctx.fillText(ctg.length+' bp ('+ctg.reads_used+' reads)', x+10, y+h-8);
+    }
+    ctx.strokeStyle='#495057'; ctx.lineWidth=1; ctx.strokeRect(x,y,maxW,h);
+});
+
+// ---------- CLIPBOARD ----------
+function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(function(){ alert('Copied!'); });
+    } else {
+        var ta=document.createElement('textarea'); ta.value=text;
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); alert('Copied!'); } catch(e) { alert('Copy failed.'); }
+        document.body.removeChild(ta);
+    }
+}
+function copyNow(seq) { copyText(seq); }
+function copyAllNow() {
+    var text = allContigs.map(function(c){ return '>contig_'+c.cluster_id+' ('+c.length+' bp)\n'+c.contig; }).join('\n\n');
+    copyText(text);
+}
+function saveAllNow() {
+    var text = allContigs.map(function(c){ return '>contig_'+c.cluster_id+' ('+c.length+' bp)\n'+c.contig; }).join('\n\n');
+    var blob = new Blob([text],{type:'text/plain'});
+    var a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='all_contigs.fasta'; a.click();
+}
+
+// ---------- TRANSLATION ----------
+function translateNow(clusterId) {
+    var ctg = allContigs.find(function(c){ return c.cluster_id == clusterId; });
+    if (!ctg) return;
+    
+    var gcode = document.getElementById('gencode_'+clusterId).value;
+    var methodSel = document.getElementById('method_'+clusterId);
+    var method = methodSel ? methodSel.value : 'auto';
+    var frameVal = 'auto';
+    if (method === 'manual') {
+        var frameSel = document.getElementById('frame_'+clusterId);
+        frameVal = frameSel ? frameSel.value : '1';
+    }
+
+    var div = document.getElementById('translate_result_'+clusterId);
+    div.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Translating...';
+    
+    fetch(window.location.origin+'/translate', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+            sequence: ctg.contig,
+            method: method === 'manual' ? parseInt(frameVal) : method,
+            genetic_code: parseInt(gcode)
+        })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+        var cls = data.color === 'success' ? 'alert-success' : (data.color==='warning'?'alert-warning':'alert-info');
+        div.innerHTML = '<div class="alert '+cls+' py-1 px-2 small">✅ '+data.method_description+'</div>'+
+            '<pre style="background:white;padding:8px;border-radius:4px;font-family:monospace;white-space:pre-wrap;">'+data.protein+'</pre>'+
+            '<small class="text-muted">'+data.protein.length+' aa | Frame '+(data.frame>0?'+':'')+data.frame+'</small>';
+    })
+    .catch(function(err){ div.innerHTML='<div class="alert alert-danger py-1 px-2 small">Translation failed: '+err.message+'</div>'; });
+}
+
+// ---------- BLAST ----------
+function blastNow(clusterId) {
+    var ctg = allContigs.find(function(c){ return c.cluster_id == clusterId; });
+    if (!ctg) return;
+    
+    var db = document.getElementById('blast_db_'+clusterId).value;
+    var prog = document.getElementById('blast_prog_'+clusterId).value;
+    var max = document.getElementById('blast_max_'+clusterId).value;
+
+    var div = document.getElementById('blast_result_'+clusterId);
+    div.innerHTML = '<span class="spinner-border spinner-border-sm"></span> BLASTing...';
+    
+    fetch(window.location.origin+'/blast', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ sequence: ctg.contig, mode:'web', db:db, program:prog, max_hits:parseInt(max) })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+        if (data.error) { div.innerHTML='<div class="alert alert-danger py-1 px-2 small">'+data.error+'</div>'; return; }
+        if (!data.length) { div.innerHTML='<div class="alert alert-warning py-1 px-2 small">No hits.</div>'; return; }
+        var html='<div class="table-responsive"><table class="table table-sm small mb-0" style="width:100%;">';
+        html+='<thead><tr><th>#</th><th>Description</th><th>Score</th><th>E-value</th><th>Identity</th></tr></thead><tbody>';
+        data.forEach(function(h,i){
+            html+='<tr><td>'+(i+1)+'</td><td>'+(h.title||'').substring(0,80)+'...</td><td>'+h.score+'</td><td>'+(h.evalue||'')+'</td><td>'+(h.identity||'')+'%</td></tr>';
+        });
+        html+='</tbody></table></div>';
+        div.innerHTML = html;
+    })
+    .catch(function(err){ div.innerHTML='<div class="alert alert-danger py-1 px-2 small">BLAST failed: '+err.message+'</div>'; });
+}
+
+// ---------- MSA ----------
+function msaNow(clusterId) {
+    var ctg = allContigs.find(function(c){ return c.cluster_id == clusterId; });
+    if (!ctg) return;
+    
+    var raw = document.getElementById('msa_seqs_'+clusterId).value.trim();
+    if (!raw) {
+        alert('Please paste at least one additional sequence in FASTA format.');
+        return;
+    }
+    
+    var lines = raw.split('\n');
+    var seqs = [ctg.contig], labels = ['contig_'+clusterId];
+    var curLab=null, curSeq='';
+    for (var i=0; i<lines.length; i++) {
+        if (lines[i].startsWith('>')) {
+            if (curLab && curSeq) { seqs.push(curSeq); labels.push(curLab); }
+            curLab = lines[i].substring(1).trim()||('seq_'+labels.length);
+            curSeq = '';
+        } else if (lines[i].trim()) { curSeq += lines[i].trim().toUpperCase(); }
+    }
+    if (curLab && curSeq) { seqs.push(curSeq); labels.push(curLab); }
+    if (seqs.length<2) { alert('Need at least 2 sequences for alignment.'); return; }
+    
+    var modalDiv = document.getElementById('msa_result_modal_'+clusterId);
+    if (modalDiv) modalDiv.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Aligning...';
+    
+    fetch(window.location.origin+'/msa', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ sequences: seqs, labels: labels })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+        if (data.error) {
+            if (modalDiv) modalDiv.innerHTML = '<div class="alert alert-danger py-1 px-2 small">'+data.error+'</div>';
+            return;
+        }
+        if (modalDiv) modalDiv.innerHTML = data.html;
+        var mainDiv = document.getElementById('msa_result_'+clusterId);
+        if (mainDiv) mainDiv.innerHTML = data.html;
+    })
+    .catch(function(err){
+        if (modalDiv) modalDiv.innerHTML = '<div class="alert alert-danger py-1 px-2 small">MSA failed: '+err.message+'</div>';
+    });
+}
+</script>
+{% endblock %}

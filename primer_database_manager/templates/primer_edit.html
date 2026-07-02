@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}Edit Primer{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center">
+    <h2>✏️ Edit Primer: {{ primer.name }}</h2>
+    <div class="no-print">
+        <button class="btn btn-success" onclick="window.print()">🖨️ Print</button>
+        <a href="{{ url_for('primer_detail', primer_id=primer.id) }}" class="btn btn-secondary">Cancel</a>
+    </div>
+</div>
+
+{% if lock %}
+<div class="alert alert-warning no-print">
+    🔒 This primer is being edited by <strong>{{ lock.username }}</strong>.
+    {% if session.role == 'admin' %}
+    <a href="{{ url_for('primer_unlock', primer_id=primer.id) }}" class="btn btn-sm btn-danger">Break Lock (Admin)</a>
+    {% endif %}
+</div>
+{% endif %}
+
+<form method="POST" class="row g-3">
+    <input type="hidden" name="lock_check" value="1">
+
+    <div class="col-md-6">
+        <label class="form-label">Name *</label>
+        <input type="text" class="form-control" name="name" value="{{ primer.name }}" required>
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">Pair Name</label>
+        <input type="text" class="form-control" name="pair_name" value="{{ primer.pair_name or '' }}">
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label">Forward Sequence *</label>
+        <div class="input-group">
+            <input type="text" class="form-control sequence" id="forward_seq" name="forward_sequence"
+                   value="{{ primer.forward_sequence }}" {% if not session.get('edit_sequence') %}readonly{% endif %} required>
+            <button type="button" class="btn btn-outline-secondary" onclick="toggleReadonly('forward_seq')">
+                {% if not session.get('edit_sequence') %}🔓 Edit{% else %}🔒 Lock{% endif %}
+            </button>
+        </div>
+        <small class="text-muted">Click "Edit" to enable editing (admin can always edit).</small>
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">Reverse Sequence</label>
+        <div class="input-group">
+            <input type="text" class="form-control sequence" id="reverse_seq" name="reverse_sequence"
+                   value="{{ primer.reverse_sequence or '' }}" {% if not session.get('edit_sequence') %}readonly{% endif %}>
+            <button type="button" class="btn btn-outline-secondary" onclick="toggleReadonly('reverse_seq')">
+                {% if not session.get('edit_sequence') %}🔓 Edit{% else %}🔒 Lock{% endif %}
+            </button>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <label class="form-label">Gene</label>
+        <input type="text" class="form-control" name="gene" value="{{ primer.gene or '' }}">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Organism</label>
+        <input type="text" class="form-control" name="organism" value="{{ primer.organism or '' }}">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Strain/Serotype</label>
+        <input type="text" class="form-control" name="strain_or_serotype" value="{{ primer.strain_or_serotype or '' }}">
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label">PCR Type</label>
+        <select class="form-select" name="pcr_type">
+            <option value="">-- Select --</option>
+            <option value="qPCR" {% if primer.pcr_type=='qPCR' %}selected{% endif %}>qPCR</option>
+            <option value="Conventional" {% if primer.pcr_type=='Conventional' %}selected{% endif %}>Conventional</option>
+            <option value="Multiplex" {% if primer.pcr_type=='Multiplex' %}selected{% endif %}>Multiplex</option>
+            <option value="Nested" {% if primer.pcr_type=='Nested' %}selected{% endif %}>Nested</option>
+            <option value="RT-PCR" {% if primer.pcr_type=='RT-PCR' %}selected{% endif %}>RT-PCR</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Amplicon Length (bp)</label>
+        <input type="number" class="form-control" name="amplicon_length" value="{{ primer.amplicon_length or '' }}">
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Estimated Tm (°C)</label>
+        <input type="number" step="0.1" class="form-control" name="estimated_tm" value="{{ primer.estimated_tm or '' }}">
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Experimental Tm (°C)</label>
+        <input type="number" step="0.1" class="form-control" name="experimental_tm" value="{{ primer.experimental_tm or '' }}">
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label">Reference</label>
+        <input type="text" class="form-control" name="reference" value="{{ primer.reference or '' }}">
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">Diagnostic Limitations</label>
+        <input type="text" class="form-control" name="diagnostic_limitations" value="{{ primer.diagnostic_limitations or '' }}">
+    </div>
+
+    <div class="col-md-4">
+        <label class="form-label">Binding Region</label>
+        <input type="text" class="form-control" name="binding_region" value="{{ primer.binding_region or '' }}">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Binding Detail</label>
+        <input type="text" class="form-control" name="binding_detail" value="{{ primer.binding_detail or '' }}">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Stock Concentration (µM)</label>
+        <input type="number" step="0.1" class="form-control" name="stock_concentration" value="{{ primer.stock_concentration or '' }}">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">Working Volume (µL)</label>
+        <input type="number" step="0.1" class="form-control" name="working_volume_per_reaction" value="{{ primer.working_volume_per_reaction or '' }}">
+    </div>
+    <div class="col-md-8">
+        <label class="form-label">General Notes</label>
+        <input type="text" class="form-control" name="general_notes" value="{{ primer.general_notes or '' }}">
+    </div>
+
+    <div class="col-12">
+        <div class="form-check form-check-inline">
+            <input class="form-check-input" type="checkbox" name="for_sequencing" {% if primer.for_sequencing %}checked{% endif %}>
+            <label class="form-check-label">For Sequencing</label>
+        </div>
+        <div class="form-check form-check-inline">
+            <input class="form-check-input" type="checkbox" name="for_diagnosis" {% if primer.for_diagnosis %}checked{% endif %}>
+            <label class="form-check-label">For Diagnosis</label>
+        </div>
+    </div>
+
+    <div class="col-12">
+        <h5>📝 Custom Fields</h5>
+        <div id="customFields">
+            {% for field in custom_fields %}
+            <div class="row g-2 mb-2 custom-field-row">
+                <div class="col-md-5">
+                    <input type="text" class="form-control" name="custom_field_name" value="{{ field.field_name }}" placeholder="Field name">
+                </div>
+                <div class="col-md-5">
+                    <input type="text" class="form-control" name="custom_field_value" value="{{ field.field_value }}" placeholder="Value">
+                </div>
+                <div class="col-md-2">
+                    <button type="button" class="btn btn-danger btn-sm" onclick="removeCustomField(this)">Remove</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="addCustomField()">+ Add Custom Field</button>
+    </div>
+
+    <div class="col-12">
+        <button type="submit" class="btn btn-primary">Update Primer</button>
+        <a href="{{ url_for('primer_detail', primer_id=primer.id) }}" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+
+<script>
+    function addCustomField() {
+        const container = document.getElementById('customFields');
+        const row = document.createElement('div');
+        row.className = 'row g-2 mb-2 custom-field-row';
+        row.innerHTML = `
+            <div class="col-md-5">
+                <input type="text" class="form-control" name="custom_field_name" placeholder="Field name">
+            </div>
+            <div class="col-md-5">
+                <input type="text" class="form-control" name="custom_field_value" placeholder="Value">
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-danger btn-sm" onclick="removeCustomField(this)">Remove</button>
+            </div>
+        `;
+        container.appendChild(row);
+    }
+
+    function removeCustomField(btn) {
+        btn.closest('.custom-field-row').remove();
+    }
+
+    function toggleReadonly(fieldId) {
+        const input = document.getElementById(fieldId);
+        const isReadonly = input.hasAttribute('readonly');
+        if (isReadonly) {
+            input.removeAttribute('readonly');
+            input.style.backgroundColor = '#fff';
+            const btn = input.parentElement.querySelector('button');
+            if (btn) btn.textContent = '🔒 Lock';
+        } else {
+            input.setAttribute('readonly', 'readonly');
+            input.style.backgroundColor = '#e9ecef';
+            const btn = input.parentElement.querySelector('button');
+            if (btn) btn.textContent = '🔓 Edit';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.sequence').forEach(function(input) {
+            if (input.hasAttribute('readonly')) {
+                input.style.backgroundColor = '#e9ecef';
+                const btn = input.parentElement.querySelector('button');
+                if (btn) btn.textContent = '🔓 Edit';
+            } else {
+                const btn = input.parentElement.querySelector('button');
+                if (btn) btn.textContent = '🔒 Lock';
+            }
+        });
+    });
+</script>
+{% endblock %}

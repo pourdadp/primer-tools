@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Backup{% endblock %}
+{% block content %}
+<h2>💾 Backup & Restore</h2>
+<div class="mb-3">
+    <a href="{{ url_for('backup_create') }}" class="btn btn-success">Create Backup</a>
+</div>
+<table class="table table-striped">
+    <thead><tr><th>Filename</th><th>Size</th><th>Modified</th><th>Actions</th></tr></thead>
+    <tbody>
+        {% for b in backups %}
+        <tr>
+            <td>{{ b.name }}</td>
+            <td>{{ (b.size / 1024)|round(1) }} KB</td>
+            <td>{{ b.modified }}</td>
+            <td>
+                <a href="{{ url_for('backup_download', filename=b.name) }}" class="btn btn-sm btn-primary">Download</a>
+                <a href="{{ url_for('backup_restore', filename=b.name) }}" class="btn btn-sm btn-warning" onclick="return confirm('Restore this backup? Current database will be overwritten.')">Restore</a>
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-muted">No backups found.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

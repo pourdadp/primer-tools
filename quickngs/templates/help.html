@@ -1,0 +1,38 @@
+<!-- templates/help.html -->
+{% extends "base.html" %}
+{% block title %}Help – QuickNGS{% endblock %}
+{% block content %}
+<div class="container py-4">
+    <div class="mx-auto" style="max-width: 800px;">
+        <h3 class="fw-bold">❓ Quick Help</h3>
+        <hr>
+        
+        <h5>📂 Supported File Types</h5>
+        <ul>
+            <li><strong>NGS:</strong> Paired FASTQ files (.fastq, .fq, .gz). <em>Exactly two files required (R1 &amp; R2).</em></li>
+            <li><strong>Sanger:</strong> AB1 (.ab1), FASTA (.fasta, .fa), plain text (.seq, .txt). <em>One or more files.</em></li>
+        </ul>
+        
+        <h5>🧠 Analysis Modes</h5>
+        <ul>
+            <li><strong>Reference‑Based NGS:</strong> Aligns reads to a selected genome, calls variants, and annotates them.</li>
+            <li><strong>De Novo Assembly (Sanger):</strong> Assembles reads without a reference using Greedy, Semi‑Global, or De Bruijn algorithms.</li>
+            <li><strong>Guided Assembly (Sanger):</strong> Aligns reads to a user‑provided reference and builds a consensus sequence.</li>
+        </ul>
+        
+        <h5>⚙️ Key Parameters</h5>
+        <ul>
+            <li><strong>Min Quality (Q):</strong> Phred quality threshold for trimming (Q20 = 1% error).</li>
+            <li><strong>Window Size:</strong> Number of consecutive bases used to compute average quality when trimming.</li>
+            <li><strong>Trim Adapters (NGS):</strong> Removes adapter sequences and low‑quality ends (Trimmomatic).</li>
+            <li><strong>Direction (Sanger):</strong> Auto / Forward / Reverse – controls which strand is used for alignment.</li>
+        </ul>
+        
+        <h5>💾 Saving &amp; History</h5>
+        <p>Every analysis is automatically saved. Use the <strong>History</strong> page to view past runs, download results, or re‑inspect reports.</p>
+        
+        <hr>
+        <p class="text-muted small">For more details, visit the project <a href="https://github.com/pourdadp/primer-tools">GitHub repository</a>.</p>
+    </div>
+</div>
+{% endblock %}

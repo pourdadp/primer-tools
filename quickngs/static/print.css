@@ -1,0 +1,43 @@
+/* static/print.css */
+@media print {
+    /* Hide navigation, footer, buttons */
+    footer, .nav-tabs, .btn, button, .help-icon, .offcanvas, .position-fixed {
+        display: none !important;
+    }
+    
+    /* Remove shadows and borders for clean print */
+    .card, .table {
+        box-shadow: none !important;
+        border: 1px solid #ccc !important;
+    }
+    
+    /* Ensure text is black for readability */
+    body, .text-muted {
+        color: #000 !important;
+    }
+    
+    /* Make links visible */
+    a {
+        color: #000 !important;
+        text-decoration: underline;
+    }
+    
+    /* Expand container to full width */
+    .container, .container-fluid {
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 0 !important;
+    }
+    
+    /* Avoid page breaks inside cards */
+    .card {
+        page-break-inside: avoid;
+    }
+    
+    /* Show URL after links */
+    a[href]:after {
+        content: " (" attr(href) ")";
+        font-size: 0.8em;
+        color: #666;
+    }
+}

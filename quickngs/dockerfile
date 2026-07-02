@@ -1,0 +1,41 @@
+# quickngs/Dockerfile
+FROM python:3.10-slim
+
+# Install system dependencies and bioinformatics tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget \
+    bwa \
+    samtools \
+    fastqc \
+    trimmomatic \
+    freebayes \
+    bcftools \
+    snpeff \
+    muscle \
+    # WeasyPrint system dependencies
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libffi-dev \
+    libcairo2-dev \
+    libgdk-pixbuf2.0-0 \
+    shared-mime-info \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set SnpEff data directory (will be mounted as volume)
+ENV SNPEFF_DATA=/data/snpeff
+
+WORKDIR /app
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY . .
+
+# Create folders that will be used as volumes
+RUN mkdir -p uploads results quickngs_cache /data/snpeff
+
+EXPOSE 5002
+
+CMD ["python", "app.py"]

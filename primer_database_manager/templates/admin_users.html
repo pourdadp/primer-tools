@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Manage Users{% endblock %}
+{% block content %}
+<h2>👥 Manage Users</h2>
+<div class="card mb-3 no-print">
+    <div class="card-header">Add New User</div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('admin_user_add') }}" class="row g-2">
+            <div class="col-md-3"><input type="text" class="form-control" name="username" placeholder="Username" required></div>
+            <div class="col-md-3"><input type="password" class="form-control" name="password" placeholder="Password" required></div>
+            <div class="col-md-3">
+                <select class="form-select" name="role">
+                    <option value="viewer">Viewer</option>
+                    <option value="editor">Editor</option>
+                    <option value="admin">Admin</option>
+                </select>
+            </div>
+            <div class="col-md-3"><button type="submit" class="btn btn-primary w-100">Add User</button></div>
+        </form>
+    </div>
+</div>
+
+<table class="table table-striped">
+    <thead><tr><th>Username</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
+    <tbody>
+        {% for u in users %}
+        <tr>
+            <td>{{ u.username }}</td>
+            <td>
+                <form method="POST" action="{{ url_for('admin_user_role', user_id=u.id) }}" class="d-inline">
+                    <select class="form-select form-select-sm" name="role" onchange="this.form.submit()">
+                        <option value="viewer" {% if u.role=='viewer' %}selected{% endif %}>Viewer</option>
+                        <option value="editor" {% if u.role=='editor' %}selected{% endif %}>Editor</option>
+                        <option value="admin" {% if u.role=='admin' %}selected{% endif %}>Admin</option>
+                    </select>
+                </form>
+            </td>
+            <td>
+                <span class="badge bg-{{ 'success' if u.is_active else 'danger' }}">
+                    {{ 'Active' if u.is_active else 'Inactive' }}
+                </span>
+                {% if u.username != 'admin' %}
+                <a href="{{ url_for('admin_user_toggle', user_id=u.id) }}" class="btn btn-sm btn-warning no-print">
+                    {{ 'Deactivate' if u.is_active else 'Activate' }}
+                </a>
+                {% endif %}
+            </td>
+            <td>{{ u.created_at }}</td>
+            <td>
+                {% if u.username != 'admin' %}
+                <button class="btn btn-sm btn-info no-print" data-bs-toggle="collapse" data-bs-target="#reset-{{ u.id }}">Reset Password</button>
+                <div id="reset-{{ u.id }}" class="collapse mt-1">
+                    <form method="POST" action="{{ url_for('admin_user_reset_password', user_id=u.id) }}" class="d-inline">
+                        <input type="password" class="form-control form-control-sm d-inline-block w-auto" name="new_password" placeholder="New Password" required>
+                        <button type="submit" class="btn btn-sm btn-primary">Set</button>
+                    </form>
+                </div>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

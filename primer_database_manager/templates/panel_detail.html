@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Panel Details{% endblock %}
+{% block content %}
+<h2>📋 Panel: {{ panel.panel_name }}</h2>
+<p><strong>Description:</strong> {{ panel.description or '-' }}</p>
+<p><strong>Organism:</strong> {{ panel.organism or '-' }}</p>
+<p><strong>Created:</strong> {{ panel.created_at }}</p>
+
+<h4>Primers in this Panel</h4>
+<table class="table table-striped">
+    <thead><tr><th>Primer</th><th>Probe</th><th>Volume (µL)</th><th>Concentration (µM)</th></tr></thead>
+    <tbody>
+        {% for item in items %}
+        <tr>
+            <td>{{ item.primer_name }}</td>
+            <td>{{ item.probe_sequence or '-' }}</td>
+            <td>{{ item.working_volume_per_reaction or '-' }}</td>
+            <td>{{ item.final_concentration or '-' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-muted">No primers in this panel.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+<a href="{{ url_for('panel_list') }}" class="btn btn-secondary">Back to Panels</a>
+{% endblock %}

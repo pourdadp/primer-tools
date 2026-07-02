@@ -1,0 +1,37 @@
+<!-- templates/results.html -->
+{% extends "base.html" %}
+{% block title %}Analysis Progress – QuickNGS{% endblock %}
+{% block content %}
+<div class="container py-3">
+    <div class="mx-auto" style="max-width: 700px;">
+        <h4 class="fw-bold">🚀 Analysis Started</h4>
+        <p>Run ID: <strong id="runIdDisplay">{{ run_id }}</strong></p>
+        <div class="progress mb-3" style="height: 25px;">
+            <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%">0%</div>
+        </div>
+        <p id="stepText">Starting pipeline...</p>
+        <a href="/results/{{ run_id }}" class="btn btn-outline-primary btn-sm" id="viewResultsBtn" style="display:none;">View Final Results</a>
+    </div>
+</div>
+
+<script>
+var runId = "{{ run_id }}";
+var interval = setInterval(function() {
+    fetch('/status/' + runId)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            document.getElementById('progressBar').style.width = data.progress + '%';
+            document.getElementById('progressBar').textContent = data.progress + '%';
+            document.getElementById('stepText').textContent = data.step + ': ' + (data.message || '');
+            if (data.progress >= 100) {
+                clearInterval(interval);
+                document.getElementById('viewResultsBtn').style.display = 'inline-block';
+            }
+            if (data.step === 'Error') {
+                clearInterval(interval);
+                document.getElementById('stepText').innerHTML = '<span class="text-danger">❌ Error: ' + data.message + '</span>';
+            }
+        });
+}, 5000);
+</script>
+{% endblock %}

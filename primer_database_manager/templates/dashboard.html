@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h2>📊 Dashboard</h2>
+<div class="row mt-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <h5 class="card-title">Total Primers</h5>
+                <p class="card-text display-6">{{ primers_count }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <h5 class="card-title">Total Users</h5>
+                <p class="card-text display-6">{{ users_count }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <h5 class="card-title">Panels</h5>
+                <p class="card-text display-6">{{ panels|length }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body">
+                <h5 class="card-title">Quick Actions</h5>
+                <a href="{{ url_for('primer_add') }}" class="btn btn-light btn-sm">+ Add Primer</a>
+                <a href="{{ url_for('panel_add') }}" class="btn btn-light btn-sm">+ Add Panel</a>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="mt-4">
+    <h5>Recent Primers</h5>
+    <table class="table table-striped">
+        <thead>
+            <tr><th>Name</th><th>Gene</th><th>Organism</th><th>Added</th></tr>
+        </thead>
+        <tbody>
+            {% for p in primers[:5] %}
+            <tr>
+                <td><a href="{{ url_for('primer_detail', primer_id=p.id) }}">{{ p.name }}</a></td>
+                <td>{{ p.gene or '-' }}</td>
+                <td>{{ p.organism or '-' }}</td>
+                <td>{{ p.created_at }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-muted">No primers found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

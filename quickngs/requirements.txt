@@ -1,0 +1,5 @@
+flask>=2.3.0
+biopython==1.79
+pyyaml==6.0
+plotly==5.9.0
+weasyprint
